@@ -1,0 +1,12 @@
+# Everything personal stays local. Only ciphertext (data/vault.enc) is committed.
+export/
+export*/
+*.zip
+tools/.tmdb-cache.json
+config.local*
+.env*
+
+# macOS / editor
+.DS_Store
+*.log
+node_modules/
