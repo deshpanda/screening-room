@@ -4,7 +4,10 @@
 // doesn't re-prompt; Lock clears it.
 
 import { decryptWithKeyBytes, deriveKeyBytes, envelopeSalt, b64 } from '../lib/vaultcrypto.js';
-import { h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block } from '../lib/render.js';
+import { h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block, resetBlockCounter } from '../lib/render.js';
+
+const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const YEAR_WEEKS = 54; // one shared grid for every year strip
 
 const KEY_SLOT = 'sr-key';
 const root = document.getElementById('root');
@@ -75,6 +78,7 @@ function renderGate(message = '') {
 // ---------- dashboard ----------
 function renderDashboard(v) {
   root.innerHTML = '';
+  resetBlockCounter();
   const wrap = h('div', 'wrap');
 
   // masthead
@@ -92,7 +96,15 @@ function renderDashboard(v) {
   // hero
   const hero = h('div', 'hero');
   const hh = h('h2');
-  hh.innerHTML = `${v.totals.uniqueFilms.toLocaleString()} films.<br><em>${v.totals.hours.toLocaleString()} hours</em> in the dark.`;
+  const nFilms = h('span');
+  nFilms.dataset.count = v.totals.uniqueFilms;
+  nFilms.textContent = v.totals.uniqueFilms.toLocaleString();
+  const em = document.createElement('em');
+  const nHours = h('span');
+  nHours.dataset.count = v.totals.hours;
+  nHours.textContent = v.totals.hours.toLocaleString();
+  em.append(nHours, ' hours');
+  hh.append(nFilms, ' films.', document.createElement('br'), em, ' in the dark.');
   hero.appendChild(hh);
   hero.appendChild(h('p', null,
     `${v.totals.diaryEntries.toLocaleString()} logged watches, ${v.totals.rewatches.toLocaleString()} of them rewatches. ` +
@@ -107,17 +119,17 @@ function renderDashboard(v) {
   tiles.appendChild(tile('Avg rating', v.totals.avgRating ? `${v.totals.avgRating}★` : '—', `${v.totals.ratedCount} rated`));
   tiles.appendChild(tile('Rewatches', v.totals.rewatches.toLocaleString()));
   if (thisYear) tiles.appendChild(tile(`In ${thisYear.year}`, String(thisYear.count), `${thisYear.hours} hours`));
-  if (v.medianReleaseYear) tiles.appendChild(tile('Median release', String(v.medianReleaseYear), v.avgFilmAge ? `avg film is ${v.avgFilmAge} yrs old` : null));
+  if (v.medianReleaseYear) tiles.appendChild(tile('Median release', String(v.medianReleaseYear), v.avgFilmAge ? `avg film is ${v.avgFilmAge} yrs old` : null, { animate: false }));
   tiles.appendChild(tile('Watchlist', v.totals.watchlistCount.toLocaleString(), 'unwatched debts'));
   wrap.appendChild(tiles);
 
-  // the reel — one strip per year, since the beginning
-  const hm = block('The reel — year by year', 'one cell per day');
+  // the reel — one strip per year, same scale everywhere so the years compare
+  const hm = block('The reel — year by year', 'one cell per day, one scale');
   const strips = v.heatmapYears || [];
   for (const yr of strips) {
     const strip = h('div', 'yearstrip');
     strip.appendChild(h('div', 'yearlabel', `${yr.year} — ${yr.count} film${yr.count === 1 ? '' : 's'}`));
-    strip.appendChild(heatmap(yr.byDate));
+    strip.appendChild(heatmap(yr.byDate, { weeks: YEAR_WEEKS }));
     hm.appendChild(strip);
   }
   wrap.appendChild(hm);
@@ -132,7 +144,7 @@ function renderDashboard(v) {
     tipText: `${y.year} — ${y.count} films · ${y.hours} h · avg ${y.avgRating ?? '—'}★`,
   }))));
   const p2 = h('div', 'panel');
-  p2.appendChild(h('h4', null, 'How hard a grader you are'));
+  p2.appendChild(h('h4', null, `How hard a grader you are${v.totals.avgRating ? ` — lifetime ${v.totals.avgRating}★` : ''}`));
   // numeric sort — Object.entries puts integer-like keys first otherwise
   p2.appendChild(vBars(Object.entries(v.ratingsHist).sort((a, b) => a[0] - b[0]).map(([r, n]) => ({
     label: (+r) % 1 ? '' : r + '★', value: n,
@@ -352,23 +364,43 @@ function renderDashboard(v) {
       return li;
     });
     pa2.appendChild(ul2);
-    const count = h('p', 'archive-count', `${rows.length} of ${rows.length} shown`);
-    pa2.appendChild(count);
+    const foot = h('div', 'archive-foot');
+    const count = h('p', 'archive-count', '');
+    const more = h('button', 'btn archive-more', 'Show more');
+    more.type = 'button';
+    foot.appendChild(count);
+    foot.appendChild(more);
+    pa2.appendChild(foot);
 
-    inp.addEventListener('input', () => {
+    // Progressive reveal: 25 rows at a time; a search always sweeps everything.
+    const PAGE = 25;
+    let cap = PAGE;
+    function applyFilter() {
       const q = inp.value.trim().toLowerCase();
+      let matches = 0;
       let shown = 0;
       for (const li of rows) {
         const hit = !q || li.dataset.q.includes(q);
-        li.style.display = hit ? '' : 'none';
-        if (hit) shown++;
+        if (hit) matches++;
+        const show = hit && (q ? true : shown < cap);
+        if (show) shown++;
+        li.style.display = show ? '' : 'none';
       }
-      count.textContent = `${shown} of ${rows.length} shown`;
-    });
+      more.style.display = !q && cap < rows.length ? '' : 'none';
+      count.textContent = q
+        ? `${matches} match${matches === 1 ? '' : 'es'} of ${rows.length}`
+        : `showing ${Math.min(cap, rows.length)} of ${rows.length}`;
+    }
+    more.addEventListener('click', () => { cap += 100; applyFilter(); });
+    inp.addEventListener('input', applyFilter);
+    applyFilter();
 
     ar.appendChild(pa2);
     wrap.appendChild(ar);
   }
+
+  // end card
+  wrap.appendChild(h('div', 'fin', 'fin.'));
 
   // credits
   const foot = h('footer', 'credits');
@@ -379,6 +411,57 @@ function renderDashboard(v) {
 
   root.appendChild(wrap);
   window.scrollTo(0, 0);
+  polish(wrap);
+}
+
+// ---------- motion: count-ups and scroll-reveal (skipped for reduced motion) --
+function countUp(el) {
+  const target = Number(el.dataset.count);
+  if (!Number.isFinite(target) || target <= 0) return;
+  const dur = 900;
+  const t0 = performance.now();
+  const step = (t) => {
+    const p = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * eased).toLocaleString();
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function polish(wrap) {
+  const blocks = [...wrap.querySelectorAll('section.block')];
+  if (REDUCED_MOTION) {
+    blocks.forEach((b) => b.classList.add('on'));
+    return;
+  }
+  wrap.querySelectorAll('[data-count]').forEach(countUp);
+  // Plain rect checks on a rAF-throttled scroll listener — no observer APIs,
+  // so a section can never be left invisible.
+  let pending = blocks;
+  let ticking = false;
+  const check = () => {
+    ticking = false;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!vh) {
+      // a viewport we can't measure gets no animation — content always wins
+      pending.forEach((b) => b.classList.add('on'));
+      pending = [];
+    }
+    const limit = vh * 0.94;
+    pending = pending.filter((b) => {
+      if (b.getBoundingClientRect().top < limit) { b.classList.add('on'); return false; }
+      return true;
+    });
+    if (!pending.length) {
+      removeEventListener('scroll', onScroll);
+      removeEventListener('resize', onScroll);
+    }
+  };
+  const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(check); } };
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll, { passive: true });
+  check();
 }
 
 main();

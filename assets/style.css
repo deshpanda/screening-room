@@ -87,8 +87,11 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---------- the dashboard ---------- */
 .masthead {
+  position: sticky; top: 0; z-index: 5;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
-  padding: 22px 0 18px;
+  padding: 16px 0 13px;
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;
 }
 .masthead .title { font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; font-size: 1.05rem; }
@@ -132,6 +135,13 @@ section.block { margin: 42px 0; }
 }
 .block-head .rule { flex: 1; height: 1px; background: var(--line); }
 .block-head .note { font-family: var(--mono); font-size: 0.68rem; color: var(--faint); letter-spacing: 0.08em; white-space: nowrap; }
+.reelno { color: var(--amber); margin-right: 12px; font-weight: 400; }
+
+/* scroll-reveal — sections rise in like reel changes */
+@media (prefers-reduced-motion: no-preference) {
+  section.block { opacity: 0; transform: translateY(16px); transition: opacity 0.55s ease, transform 0.55s ease; }
+  section.block.on { opacity: 1; transform: none; }
+}
 
 .grid2 { display: grid; gap: 18px; grid-template-columns: 1fr; }
 @media (min-width: 800px) { .grid2 { grid-template-columns: 1fr 1fr; } }
@@ -207,7 +217,22 @@ section.block { margin: 42px 0; }
 .archive-filter input:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
 .archive-count {
   font-family: var(--mono); font-size: 0.68rem; color: var(--faint);
-  letter-spacing: 0.1em; margin: 8px 0 0;
+  letter-spacing: 0.1em; margin: 0;
+}
+.archive-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.btn {
+  font: inherit; font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 5px; padding: 7px 14px;
+}
+.btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* end card */
+.fin {
+  text-align: center; font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic; font-size: 2.1rem; color: var(--muted);
+  letter-spacing: 0.08em; margin: 64px 0 0;
 }
 
 /* tooltip */
