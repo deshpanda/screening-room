@@ -137,9 +137,19 @@ section.block { margin: 42px 0; }
 .block-head .note { font-family: var(--mono); font-size: 0.68rem; color: var(--faint); letter-spacing: 0.08em; white-space: nowrap; }
 .reelno { color: var(--amber); margin-right: 12px; font-weight: 400; }
 
-/* scroll-reveal — sections rise in like reel changes */
+/* entrances — the page arrives like a projection warming up */
 @media (prefers-reduced-motion: no-preference) {
-  section.block { opacity: 0; transform: translateY(16px); transition: opacity 0.55s ease, transform 0.55s ease; }
+  .hero, .tiles { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .tiles { animation-delay: 0.12s; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(26px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* scroll-reveal — sections rise in like reel changes */
+  section.block {
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
   section.block.on { opacity: 1; transform: none; }
 }
 
@@ -220,6 +230,7 @@ section.block { margin: 42px 0; }
   letter-spacing: 0.1em; margin: 0;
 }
 .archive-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.archive-btns { display: flex; gap: 8px; }
 .btn {
   font: inherit; font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;

@@ -366,10 +366,15 @@ function renderDashboard(v) {
     pa2.appendChild(ul2);
     const foot = h('div', 'archive-foot');
     const count = h('p', 'archive-count', '');
+    const btns = h('div', 'archive-btns');
     const more = h('button', 'btn archive-more', 'Show more');
+    const less = h('button', 'btn archive-less', 'Show less');
     more.type = 'button';
+    less.type = 'button';
+    btns.appendChild(less);
+    btns.appendChild(more);
     foot.appendChild(count);
-    foot.appendChild(more);
+    foot.appendChild(btns);
     pa2.appendChild(foot);
 
     // Progressive reveal: 25 rows at a time; a search always sweeps everything.
@@ -387,11 +392,17 @@ function renderDashboard(v) {
         li.style.display = show ? '' : 'none';
       }
       more.style.display = !q && cap < rows.length ? '' : 'none';
+      less.style.display = !q && cap > PAGE ? '' : 'none';
       count.textContent = q
         ? `${matches} match${matches === 1 ? '' : 'es'} of ${rows.length}`
         : `showing ${Math.min(cap, rows.length)} of ${rows.length}`;
     }
     more.addEventListener('click', () => { cap += 100; applyFilter(); });
+    less.addEventListener('click', () => {
+      cap = PAGE;
+      applyFilter();
+      ar.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'start' });
+    });
     inp.addEventListener('input', applyFilter);
     applyFilter();
 
@@ -440,6 +451,7 @@ function polish(wrap) {
   // so a section can never be left invisible.
   let pending = blocks;
   let ticking = false;
+  let firstBatch = true;
   const check = () => {
     ticking = false;
     const vh = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -448,11 +460,19 @@ function polish(wrap) {
       pending.forEach((b) => b.classList.add('on'));
       pending = [];
     }
-    const limit = vh * 0.94;
+    const limit = vh * 0.88;
+    let i = 0;
     pending = pending.filter((b) => {
-      if (b.getBoundingClientRect().top < limit) { b.classList.add('on'); return false; }
+      if (b.getBoundingClientRect().top < limit) {
+        // stagger only the batch visible on arrival; scroll reveals are immediate
+        b.style.transitionDelay = firstBatch ? `${0.18 + i * 0.1}s` : '0s';
+        b.classList.add('on');
+        i++;
+        return false;
+      }
       return true;
     });
+    firstBatch = false;
     if (!pending.length) {
       removeEventListener('scroll', onScroll);
       removeEventListener('resize', onScroll);
@@ -461,7 +481,10 @@ function polish(wrap) {
   const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(check); } };
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onScroll, { passive: true });
-  check();
+  // Let the hidden state paint first — a transition needs a "before" frame.
+  requestAnimationFrame(() => requestAnimationFrame(check));
+  // If rAF is starved (headless/embedded viewers), content still wins.
+  setTimeout(() => { if (firstBatch) check(); }, 350);
 }
 
 main();
