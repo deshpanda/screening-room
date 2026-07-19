@@ -1,44 +1,46 @@
-# Setup (owner's manual steps)
+# Setup & operations
 
-## 1. Rename the repo (recommended, before enabling Pages)
+Done already: repo renamed to `screening-room`, Pages enabled, the real vault
+built from a full export and pushed.
 
-The GitHub repo was created as `letterboxd-insights`, which leaks what the
-data is. Rename it: repo → **Settings → General → Repository name** →
-`screening-room`. Old URLs redirect automatically, so nothing breaks.
+## Zero-maintenance mode (recommended): the auto-refresh
 
-## 2. Push (already wired)
+`.github/workflows/refresh.yml` runs twice a week (and on demand via the
+Actions tab → refresh-vault → Run workflow): it reads the public RSS feed,
+merges any new diary entries, enriches new films by their TMDB id, recomputes
+insights, re-encrypts, commits. Pages redeploys automatically.
 
-The local remote points at the original name — it keeps working after the
-rename via GitHub's redirect. To tidy it up after renaming:
+**One-time setup — add three repository secrets**
+(Settings → Secrets and variables → Actions → New repository secret):
 
-```sh
-git remote set-url origin git@github.com-personal:deshpanda/screening-room.git
-```
+| Secret | Value |
+|---|---|
+| `LB_USER` | your Letterboxd username |
+| `VAULT_PASS` | the vault passphrase |
+| `TMDB_KEY` | your TMDB v3 API key |
 
-## 3. Enable GitHub Pages
+Secrets are masked in logs and invisible to visitors. After that: nothing to
+maintain.
 
-Settings → Pages → Deploy from a branch → `main` / root.
-Site: `https://deshpanda.github.io/screening-room/`
+**What the feed can't carry** (the only reasons to ever re-run a full export):
+- backfilled/edited diary entries older than the feed's ~50-entry window
+- re-rating films you didn't rewatch, watchlist changes
+- GitHub pauses cron jobs after ~60 days with zero repo activity — its own
+  commits usually keep it alive; if paused, one click re-enables it.
 
-Note: on the free plan the repo and the page are public — that's exactly why
-everything sensitive ships encrypted. The committed vault is a demo
-(passphrase: `preview`) until you build your own.
+## Full rebuild (rare)
 
-## 4. Build your real vault
+1. Letterboxd → Settings → Data → **Export your data** → unzip into `export/`
+   (gitignored).
+2. `TMDB_KEY=xxxx node tools/build-vault.mjs ./export --name "S"`
+   — prompts for the passphrase (use the same one as `VAULT_PASS`, or update
+   the secret if you change it).
+3. `git add data/ && git commit -m "Refresh vault" && git push`
 
-1. Letterboxd → Settings → Data → **Export your data**; unzip into `export/`
-   (gitignored — never commit it).
-2. Free TMDB key: themoviedb.org → account Settings → API → register as
-   Developer (needed for genres/directors/runtimes; skip with `--no-enrich`).
-3. ```sh
-   TMDB_KEY=xxxx node tools/build-vault.mjs ./export --name "S"
-   ```
-   Pick a strong passphrase when prompted — it is the entire security model.
-   Don't reuse a password from anywhere else.
-4. `git add data/vault.enc && git commit -m "Refresh vault" && git push`
+## Rotating the passphrase
 
-Repeat whenever you want fresher numbers (monthly-ish is plenty; the TMDB
-cache makes re-runs fast).
+Re-run the full rebuild with a new passphrase (the TMDB cache makes it fast),
+push, and update the `VAULT_PASS` secret.
 
 ## Threat model, honestly
 

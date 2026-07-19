@@ -1,0 +1,40 @@
+# Weekly self-refresh: pull the public RSS feed, merge new diary entries,
+# re-encrypt, commit. Requires three repository secrets (Settings → Secrets
+# and variables → Actions): LB_USER, VAULT_PASS, TMDB_KEY.
+# Secrets are masked in logs and invisible to repo visitors.
+
+name: refresh-vault
+
+on:
+  schedule:
+    - cron: '23 2 * * 1,4' # Mon & Thu, 02:23 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Merge new watches from the feed
+        env:
+          LB_USER: ${{ secrets.LB_USER }}
+          VAULT_PASS: ${{ secrets.VAULT_PASS }}
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
+        run: node tools/update-from-rss.mjs
+      - name: Commit if the vault changed
+        run: |
+          if ! git diff --quiet data/; then
+            git config user.name "projectionist"
+            git config user.email "projectionist@users.noreply.github.com"
+            git add data/
+            git commit -m "Refresh vault"
+            git push
+          else
+            echo "Nothing new."
+          fi

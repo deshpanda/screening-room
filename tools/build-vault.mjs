@@ -28,6 +28,7 @@ import { demoData } from './demo-data.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE_PATH = join(ROOT, 'tools', '.tmdb-cache.json');
 const OUT_PATH = join(ROOT, 'data', 'vault.enc');
+const SRC_PATH = join(ROOT, 'data', 'source.enc');
 
 const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
@@ -211,5 +212,12 @@ if (!p1 || p1 !== p2) {
 }
 
 writeFileSync(OUT_PATH, await encryptVault(insights, p1));
-console.log(`\nWrote ${OUT_PATH} (${Math.round(readFileSync(OUT_PATH).length / 1024)} KB, AES-256-GCM).`);
-console.log('Commit data/vault.enc and push. The passphrase itself is stored nowhere.');
+// The raw rows + enrichment, same passphrase — lets the scheduled RSS
+// updater merge new watches without ever needing the export again.
+writeFileSync(SRC_PATH, await encryptVault({
+  diary: data.diary, watched: data.watched, ratings: data.ratings,
+  watchlistCount: data.watchlistCount, films: data.films,
+  displayName: data.displayName,
+}, p1));
+console.log(`\nWrote ${OUT_PATH} (${Math.round(readFileSync(OUT_PATH).length / 1024)} KB) and ${SRC_PATH} (${Math.round(readFileSync(SRC_PATH).length / 1024)} KB), both AES-256-GCM.`);
+console.log('Commit data/ and push. The passphrase itself is stored nowhere.');

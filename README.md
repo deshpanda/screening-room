@@ -14,14 +14,12 @@ Static site, no dependencies, hosted on GitHub Pages.
   the owner's machine (see `.gitignore`).
 - `robots.txt` and `noindex` keep the gate out of search engines.
 
-## Refreshing the data (owner's ritual)
+## Refreshing the data
 
-1. Download your film-diary data export (ZIP of CSVs) and unzip it locally:
-   `unzip export.zip -d export/` (the folder is gitignored).
-2. `TMDB_KEY=<your key> node tools/build-vault.mjs ./export --name "S"`
-   — you'll be prompted for the vault passphrase (never stored).
-   Add `--no-enrich` to skip TMDB (no genres/directors/runtimes).
-3. Commit the updated `data/vault.enc` and push. Done.
+A scheduled workflow (`.github/workflows/refresh.yml`) merges new entries
+from a public feed twice a week and re-encrypts — credentials live only in
+Actions secrets. Full rebuilds from a data export (rare) are documented in
+`DEPLOY.md`; the raw export never enters the repo.
 
 `node --test` runs the suite (CSV parsing, insights math, crypto round-trip).
 
