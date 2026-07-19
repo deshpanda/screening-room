@@ -9,8 +9,6 @@ on:
   schedule:
     - cron: '23 2 * * 1,4' # Mon & Thu, 02:23 UTC
   workflow_dispatch: {}
-  push:
-    paths: ['.github/workflows/refresh.yml'] # temporary: first-run smoke test
 
 permissions:
   contents: write
