@@ -190,6 +190,26 @@ section.block { margin: 42px 0; }
 }
 .chip .y { color: var(--faint); font-size: 0.75rem; }
 
+/* year strips */
+.yearstrip { margin-bottom: 16px; }
+.yearlabel {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 6px;
+}
+
+/* the archive */
+.archive-filter { margin-bottom: 10px; }
+.archive-filter input {
+  width: 100%; padding: 10px 12px; font-family: var(--mono); font-size: 0.88rem;
+  letter-spacing: 0.04em; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.archive-filter input:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+.archive-count {
+  font-family: var(--mono); font-size: 0.68rem; color: var(--faint);
+  letter-spacing: 0.1em; margin: 8px 0 0;
+}
+
 /* tooltip */
 #tip {
   position: fixed; z-index: 10; pointer-events: none; display: none;

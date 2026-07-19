@@ -133,8 +133,63 @@ test('insights: ratings histogram buckets', () => {
   assert.equal(r.ratingsHist[4], 1);
 });
 
+test('insights: heatmapYears covers each calendar year, clipped to the last watch', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.heatmapYears.length, 1);
+  const y = r.heatmapYears[0];
+  assert.equal(y.year, '2026');
+  assert.equal(y.count, 5);
+  // Jan 1 .. Feb 10 = 41 days
+  assert.equal(Object.keys(y.byDate).length, 41);
+  assert.equal(y.byDate['2026-01-03'], 2);
+  assert.equal(y.byDate['2026-01-04'], 0);
+});
+
+test('insights: comfort reels count multiple watches of the same film', () => {
+  const r = computeInsights(fixture());
+  assert.deepEqual(r.rewatchTop, [{ name: 'Heat', year: '1995', count: 2 }]);
+});
+
+test('insights: runtime buckets over unique enriched films', () => {
+  const r = computeInsights(fixture());
+  const by = Object.fromEntries(r.runtimeBuckets.map((b) => [b.label, b.count]));
+  assert.equal(by['90–120m'], 2);  // Drive 100, Ratatouille 111
+  assert.equal(by['150–180m'], 2); // Heat 170, Stalker 162
+  assert.equal(by['Under 90m'], 0);
+});
+
+test('insights: the great drought is the longest gap between watch dates', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.drought.days, 37); // Jan 3 → Feb 10
+  assert.equal(r.drought.from, '2026-01-03');
+});
+
+test('insights: pace exists with a next-milestone estimate', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.pace.perWeek, 0.1);
+  assert.equal(r.pace.nextMilestone.n, 100);
+});
+
+test('insights: ledger is the full diary, newest first', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.ledger.length, 5);
+  assert.equal(r.ledger[0].t, 'Stalker');
+  assert.equal(r.ledger[4].t, 'Heat');
+  assert.equal(r.ledger[2].w, true); // the Heat rewatch on Jan 3
+});
+
+test('insights: median release year and film age', () => {
+  const data = { ...fixture(), generatedAt: '2026-07-20' };
+  const r = computeInsights(data);
+  assert.equal(r.medianReleaseYear, 1995); // 1960,1979,[1995],2007,2011
+  assert.equal(r.avgFilmAge, Math.round(2026 - (1960 + 1979 + 1995 + 2007 + 2011) / 5));
+});
+
 test('insights: empty input does not crash', () => {
   const r = computeInsights({ diary: [], watched: [], ratings: [], films: {} });
   assert.equal(r.totals.uniqueFilms, 0);
   assert.equal(r.contrarian, null);
+  assert.deepEqual(r.heatmapYears, []);
+  assert.equal(r.pace, null);
+  assert.equal(r.drought, null);
 });

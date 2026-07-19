@@ -107,12 +107,19 @@ function renderDashboard(v) {
   tiles.appendChild(tile('Avg rating', v.totals.avgRating ? `${v.totals.avgRating}★` : '—', `${v.totals.ratedCount} rated`));
   tiles.appendChild(tile('Rewatches', v.totals.rewatches.toLocaleString()));
   if (thisYear) tiles.appendChild(tile(`In ${thisYear.year}`, String(thisYear.count), `${thisYear.hours} hours`));
+  if (v.medianReleaseYear) tiles.appendChild(tile('Median release', String(v.medianReleaseYear), v.avgFilmAge ? `avg film is ${v.avgFilmAge} yrs old` : null));
   tiles.appendChild(tile('Watchlist', v.totals.watchlistCount.toLocaleString(), 'unwatched debts'));
   wrap.appendChild(tiles);
 
-  // heatmap
-  const hm = block('The reel — last 12 months', 'one cell per day');
-  hm.appendChild(heatmap(v.heatmap));
+  // the reel — one strip per year, since the beginning
+  const hm = block('The reel — year by year', 'one cell per day');
+  const strips = v.heatmapYears || [];
+  for (const yr of strips) {
+    const strip = h('div', 'yearstrip');
+    strip.appendChild(h('div', 'yearlabel', `${yr.year} — ${yr.count} film${yr.count === 1 ? '' : 's'}`));
+    strip.appendChild(heatmap(yr.byDate));
+    hm.appendChild(strip);
+  }
   wrap.appendChild(hm);
 
   // per-year + ratings
@@ -155,6 +162,17 @@ function renderDashboard(v) {
   if (v.streaks.busiestDay) cs.appendChild(callout('Biggest single day', `${v.streaks.busiestDay.count} films`, v.streaks.busiestDay.date));
   if (v.streaks.busiestMonth) cs.appendChild(callout('Heaviest month', `${v.streaks.busiestMonth.count} films`, v.streaks.busiestMonth.month));
   if (v.runtime.longest) cs.appendChild(callout('Longest sit', `${v.runtime.longest.title}`, `${v.runtime.longest.minutes} minutes, and you lived`));
+  if (v.drought) cs.appendChild(callout('The great drought', `${v.drought.days} days without a film`, `${v.drought.from} → ${v.drought.to}`, true));
+  if (v.pace) {
+    cs.appendChild(callout('Current pace', `${v.pace.perWeek} films/week`,
+      v.pace.projectedThisYear ? `on course for ~${v.pace.projectedThisYear} in ${v.pace.year}` : ''));
+    if (v.pace.nextMilestone) cs.appendChild(callout(`Watch #${v.pace.nextMilestone.n} incoming`, v.pace.nextMilestone.eta, 'at the current pace'));
+  }
+  if (v.ratingsDrift && Math.abs(v.ratingsDrift.delta) >= 0.05) {
+    const softer = v.ratingsDrift.delta > 0;
+    cs.appendChild(callout('Ratings drift', `${softer ? '+' : ''}${v.ratingsDrift.delta}★ in ${v.ratingsDrift.year}`,
+      `you're grading ${softer ? 'softer' : 'harsher'} than your lifetime ${v.ratingsDrift.overall}★`, !softer));
+  }
   habits.appendChild(cs);
   wrap.appendChild(habits);
 
@@ -176,6 +194,24 @@ function renderDashboard(v) {
       tipText: `${d.name} — ${d.count} films${d.avgRating ? ` · avg ${d.avgRating}★` : ''}`,
     })), { height: 220 }));
     g3.appendChild(pg); g3.appendChild(pdec);
+
+    // attention span
+    if (v.runtimeBuckets && v.runtimeBuckets.some((b) => b.count)) {
+      const pr2 = h('div', 'panel');
+      pr2.appendChild(h('h4', null, 'Attention span — runtimes'));
+      pr2.appendChild(vBars(v.runtimeBuckets.map((b) => ({
+        label: b.label.replace('Under ', '<').replace('–', '–'), value: b.count,
+        tipText: `${b.label} — ${b.count} films`,
+      }))));
+      g3.appendChild(pr2);
+    }
+    // comfort reels
+    if (v.rewatchTop && v.rewatchTop.length) {
+      const pc2 = h('div', 'panel');
+      pc2.appendChild(h('h4', null, 'Comfort reels — most rewatched'));
+      pc2.appendChild(ranked(v.rewatchTop, (d) => `(${d.year})`));
+      g3.appendChild(pc2);
+    }
     taste.appendChild(g3);
     wrap.appendChild(taste);
   }
@@ -270,6 +306,69 @@ function renderDashboard(v) {
   }
   last.appendChild(g6);
   wrap.appendChild(last);
+
+  // same week, other years
+  if (v.thisWeek && v.thisWeek.length) {
+    const tw = block('Same week, other years', 'the archive remembers');
+    const pw = h('div', 'panel');
+    const uw = h('ul', 'diary');
+    for (const r of v.thisWeek.slice(0, 10)) {
+      const li = h('li');
+      li.appendChild(h('span', 'd', r.date));
+      const t = h('span', 't', r.title + ' ');
+      t.appendChild(h('span', 'y', `(${r.year})`));
+      li.appendChild(t);
+      li.appendChild(h('span', 'stars', stars(r.rating)));
+      uw.appendChild(li);
+    }
+    pw.appendChild(uw);
+    tw.appendChild(pw);
+    wrap.appendChild(tw);
+  }
+
+  // the archive — full diary, searchable
+  if (v.ledger && v.ledger.length) {
+    const ar = block('The archive', `${v.ledger.length} screenings`);
+    const pa2 = h('div', 'panel');
+    const filt = h('div', 'archive-filter');
+    const inp = h('input');
+    inp.type = 'search';
+    inp.placeholder = 'grep the diary — title or year…';
+    inp.setAttribute('aria-label', 'Filter the diary');
+    filt.appendChild(inp);
+    pa2.appendChild(filt);
+
+    const ul2 = h('ul', 'diary');
+    const rows = v.ledger.map((r) => {
+      const li = h('li');
+      li.appendChild(h('span', 'd', r.d));
+      const t = h('span', 't', r.t + ' ');
+      t.appendChild(h('span', 'y', `(${r.y})`));
+      li.appendChild(t);
+      if (r.w) li.appendChild(h('span', 'rw', 'RW'));
+      li.appendChild(h('span', 'stars', stars(r.r)));
+      li.dataset.q = (r.t + ' ' + r.y).toLowerCase();
+      ul2.appendChild(li);
+      return li;
+    });
+    pa2.appendChild(ul2);
+    const count = h('p', 'archive-count', `${rows.length} of ${rows.length} shown`);
+    pa2.appendChild(count);
+
+    inp.addEventListener('input', () => {
+      const q = inp.value.trim().toLowerCase();
+      let shown = 0;
+      for (const li of rows) {
+        const hit = !q || li.dataset.q.includes(q);
+        li.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      }
+      count.textContent = `${shown} of ${rows.length} shown`;
+    });
+
+    ar.appendChild(pa2);
+    wrap.appendChild(ar);
+  }
 
   // credits
   const foot = h('footer', 'credits');
