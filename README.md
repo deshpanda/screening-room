@@ -1,16 +1,31 @@
 # 🎞 The Screening Room
 
-**A private film dashboard hiding in plain sight.**
+**A private [Letterboxd](https://letterboxd.com) dashboard hiding in plain sight.**
 
-This is a single-viewer site: one person's complete film-watching history —
-hours in the dark, streaks, genres, most-watched directors, a contrarian
-index against the crowd — rendered as a dark little cinema and locked behind
-a passphrase. The repo and the page are fully public; the data is not.
+Letterboxd is the diary; this is the projection booth. Every film logged
+there becomes part of a single-viewer site — hours in the dark, streaks,
+genres, most-watched directors, a contrarian index against the crowd —
+rendered as a dark little cinema and locked behind a passphrase. The repo
+and the page are fully public; the data is not.
 
 ```
 you ──▶ passphrase ──▶ PBKDF2 (310k) ──▶ AES-256-GCM ──▶ your film life
 anyone else ─────────────────────────────────────────▶ ciphertext
 ```
+
+## Where the data comes from
+
+Letterboxd has no public API, so the pipeline uses the two doors it does have:
+
+1. **The seed — a one-time Letterboxd data export** (Settings → Data →
+   Export): `diary.csv`, `watched.csv`, `ratings.csv`, `watchlist.csv` give
+   the full history. Parsed locally, never committed.
+2. **The drip — the public Letterboxd RSS feed**, which carries the last ~50
+   diary entries (with TMDB ids). A scheduled workflow merges new watches
+   from it twice a week, so the export never needs downloading again.
+3. **The garnish — TMDB.** Letterboxd's export has titles and dates but no
+   genres, runtimes or credits; each film is enriched once via the TMDB API
+   and cached.
 
 ## How the privacy works
 
@@ -19,23 +34,22 @@ anyone else ──────────────────────�
   happens **only in the visitor's browser** ([`lib/vaultcrypto.js`](lib/vaultcrypto.js)),
   with a key derived from the passphrase via PBKDF2-SHA256 at 310,000
   iterations. Wrong passphrase, no picture.
-- No usernames, account identifiers, API keys or raw exports exist anywhere
-  in the repository — see [`.gitignore`](.gitignore). The gate carries
+- The Letterboxd **username appears nowhere** in the repository or the site —
+  it lives only in an Actions secret, alongside the vault passphrase and the
+  TMDB key (all masked in logs). Raw exports are gitignored. The gate carries
   `noindex` and `robots.txt` blocks crawlers.
 - The lock is real cryptography, not a hidden `<div>` — and therefore exactly
   as strong as the passphrase. Choose accordingly.
 
 ## How it stays fresh (zero maintenance)
 
-A scheduled workflow ([`.github/workflows/refresh.yml`](.github/workflows/refresh.yml))
-runs twice a week: it reads the owner's public diary feed, merges any new
-entries into the encrypted source, enriches new films with genres, runtimes
-and credits, recomputes every insight, re-encrypts, and commits — at which
-point the page redeploys itself. Credentials live only in Actions secrets
-(`LB_USER`, `VAULT_PASS`, `TMDB_KEY`), masked in logs.
+[`.github/workflows/refresh.yml`](.github/workflows/refresh.yml) runs Monday
+and Thursday: reads the Letterboxd feed, merges new diary entries into the
+encrypted source, enriches new films by their TMDB id, recomputes every
+insight, re-encrypts, commits — and GitHub Pages redeploys itself. It needs
+three repository secrets: `LB_USER`, `VAULT_PASS`, `TMDB_KEY`.
 
-The one-time seed came from a full data export; the feed keeps it current
-from there. No servers, no cron boxes, no cost.
+No servers, no cron boxes, no cost, nothing to remember.
 
 ## Under the hood
 
@@ -52,14 +66,13 @@ from there. No servers, no cron boxes, no cost.
 
 ### Change the passphrase — or reset it if you forget it
 
-Nothing is ever lost with a forgotten passphrase: the source of truth is
-your diary itself, and a new vault can always be cut from a fresh export
-with a brand-new passphrase.
+Nothing is ever lost with a forgotten passphrase: Letterboxd itself is the
+source of truth, and a new vault can always be cut from a fresh export with
+a brand-new passphrase.
 
 1. Get raw data locally, either way:
    - reuse the gitignored `export/` folder if you still have it, or
-   - download a fresh export (your film site → Settings → Data → Export)
-     and unzip it into `export/`.
+   - Letterboxd → Settings → Data → **Export your data**, unzip into `export/`.
 2. Cut a new print with the new passphrase (you'll be prompted twice):
    ```sh
    TMDB_KEY=<your key> node tools/build-vault.mjs ./export --name "S"
@@ -76,9 +89,9 @@ That's it — the old ciphertext is dead, the new passphrase is the only key.
 
 ### Full rebuild (rare)
 
-Same four steps as above. Only needed if you backfill or edit diary entries
-older than the feed's ~50-entry window, re-rate films without rewatching, or
-change the watchlist and care about that number.
+Same four steps as above. Only needed if you backfill or edit Letterboxd
+diary entries older than the feed's ~50-entry window, re-rate films without
+rewatching, or change the watchlist and care about that number.
 
 ### Run the refresh by hand
 
@@ -87,5 +100,5 @@ Actions tab → **refresh-vault** → *Run workflow*. It prints `CHANGED` or
 
 ---
 
-Film metadata: this product uses the [TMDB](https://www.themoviedb.org/) API
-but is not endorsed or certified by TMDB.
+Not affiliated with Letterboxd. Film metadata: this product uses the
+[TMDB](https://www.themoviedb.org/) API but is not endorsed or certified by TMDB.

@@ -126,7 +126,8 @@ function renderDashboard(v) {
   }))));
   const p2 = h('div', 'panel');
   p2.appendChild(h('h4', null, 'How hard a grader you are'));
-  p2.appendChild(vBars(Object.entries(v.ratingsHist).map(([r, n]) => ({
+  // numeric sort — Object.entries puts integer-like keys first otherwise
+  p2.appendChild(vBars(Object.entries(v.ratingsHist).sort((a, b) => a[0] - b[0]).map(([r, n]) => ({
     label: (+r) % 1 ? '' : r + '★', value: n,
     tipText: `${stars(+r) || r} — ${n} films`, valueLabel: n > 0 ? String(n) : '',
   })), { height: 190 }));
