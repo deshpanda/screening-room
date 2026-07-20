@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS } from '../lib/recs.js';
+import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS, SYLLABUS_EXTRAS } from '../lib/recs.js';
 import { filmKey } from '../lib/insights.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -447,10 +447,26 @@ export async function buildRecs(src, key) {
       school.total++;
       if (watched) school.done++;
     }
+    // further screening — the alternate, not counted toward credit
+    let extra = null;
+    if (SYLLABUS_EXTRAS[course.code]) {
+      const [xt, xy, xwhy] = SYLLABUS_EXTRAS[course.code];
+      let xs = await tmdb('/search/movie', { query: xt, primary_release_year: xy }, key);
+      if (!xs?.results?.length) xs = await tmdb('/search/movie', { query: xt }, key);
+      await sleep(80);
+      const xhit = xs?.results?.[0];
+      extra = {
+        title: xt, year: xy, why: xwhy,
+        tmdbId: xhit?.id || null,
+        watched: (xhit && exclude.has(xhit.id)) || exclude.has(`${normTitle(xt)} ${xy}`),
+      };
+    }
+
     const avg = courseGrades.length ? courseGrades.reduce((a, b) => a + b, 0) / courseGrades.length : null;
     school.courses.push({
       code: course.code, title: course.title, year: course.year,
       level: course.year <= 4 ? 'BA' : 'MFA',
+      extra,
       desc: course.desc, assignment: course.assignment,
       grade: avg !== null ? letterOf((avg / 5) * 4) : null,
       honors: avg !== null && avg >= 4.5,           // dean's list

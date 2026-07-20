@@ -118,6 +118,7 @@ const ratingIdx = new Map(src.ratings.map((r, i) => [filmKey(r.name, r.year), i]
 
 let added = 0;
 let enriched = 0;
+let newReviews = 0;
 for (const w of feed) {
   const entryKey = `${w.name}|${w.year}|${w.watchedDate}`;
   if (haveEntry.has(entryKey)) continue;
@@ -144,6 +145,7 @@ for (const w of feed) {
     const rk = `${w.name}|${w.year}|${w.watchedDate}`;
     if (!src.reviews.some((r) => `${r.name}|${r.year}|${r.watchedDate}` === rk)) {
       src.reviews.push({ name: w.name, year: w.year, watchedDate: w.watchedDate, rating: w.rating, text: w.reviewText });
+      newReviews++;
     }
   }
 }
@@ -156,6 +158,9 @@ if (!added) {
 src.diary.sort((a, b) => (a.watchedDate < b.watchedDate ? -1 : 1));
 src.generatedAt = new Date().toISOString().slice(0, 10);
 const insights = computeInsights(src);
+// what this print changed — shown beside the print date in the masthead
+insights.printNote = `+${added} film${added === 1 ? '' : 's'}`
+  + (newReviews ? `, +${newReviews} review${newReviews === 1 ? '' : 's'}` : '');
 
 if (TMDB_KEY) {
   console.log('Rebuilding recommendation shelves…');

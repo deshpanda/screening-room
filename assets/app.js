@@ -121,7 +121,8 @@ function masthead(v) {
   }
   mast.appendChild(nav);
   const right = h('div', 'mast-right');
-  right.appendChild(h('span', 'meta', v.generatedAt ? `print of ${v.generatedAt}` : 'private print'));
+  right.appendChild(h('span', 'meta',
+    (v.generatedAt ? `print of ${v.generatedAt}` : 'private print') + (v.printNote ? ` · ${v.printNote}` : '')));
   const lock = h('button', null, 'Lock');
   lock.addEventListener('click', () => { sessionStorage.removeItem(KEY_SLOT); location.href = BASE || './'; });
   right.appendChild(lock);
@@ -188,24 +189,43 @@ function secReel(v, wrap) {
 }
 
 function secWall(v, wrap) {
-  const posters = (v.fiveStar || []).filter((f) => f.poster);
-  if (posters.length < 3) return;
-  const wall = block('The wall', 'five stars only');
+  const tiers = v.wallTiers && v.wallTiers.length
+    ? v.wallTiers
+    : ((v.fiveStar || []).filter((f) => f.poster).length >= 3
+      ? [{ r: 5, films: v.fiveStar.filter((f) => f.poster) }] : []);
+  if (!tiers.length) return;
+  const wall = block('The wall', 'hang a rating');
+  const chipsRow = h('div', 'yr-chips');
   const grid = h('div', 'wall');
-  for (const f of posters) {
-    const a = h('a', 'wall-card');
-    a.href = lbUrl(f.tid);
-    a.target = '_blank';
-    a.rel = 'noopener';
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.alt = `${f.title} poster`;
-    img.src = `https://image.tmdb.org/t/p/w342${f.poster}`;
-    img.title = `${f.title} (${f.year})`;
-    a.appendChild(img);
-    grid.appendChild(a);
-  }
+  const show = (tier) => {
+    grid.innerHTML = '';
+    for (const f of tier.films) {
+      const a = h('a', 'wall-card');
+      a.href = lbUrl(f.tid);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = `${f.title} poster`;
+      img.src = `https://image.tmdb.org/t/p/w342${f.poster}`;
+      img.title = `${f.title} (${f.year})`;
+      a.appendChild(img);
+      grid.appendChild(a);
+    }
+  };
+  tiers.forEach((tier, i) => {
+    const c = h('button', 'chip' + (i === 0 ? ' chip-on' : ''), `${stars(tier.r)} · ${tier.films.length}`);
+    c.type = 'button';
+    c.addEventListener('click', () => {
+      chipsRow.querySelectorAll('.chip').forEach((x) => x.classList.remove('chip-on'));
+      c.classList.add('chip-on');
+      show(tier);
+    });
+    chipsRow.appendChild(c);
+  });
+  wall.appendChild(chipsRow);
   wall.appendChild(grid);
+  show(tiers[0]);
   wrap.appendChild(wall);
 }
 
@@ -842,6 +862,21 @@ function secSchool(v, wrap) {
     head.appendChild(h('span', 'course-title', course.title));
     if (course.grade) head.appendChild(h('span', 'course-grade' + (course.honors ? ' honors' : ''), course.grade + (course.honors ? ' ★' : '')));
     head.appendChild(h('span', 'course-score', `${doneHere}/${course.films.length}`));
+    const dl = h('button', 'csv-btn', '↓ csv');
+    dl.type = 'button';
+    dl.title = `Download ${course.code} as a CSV for a Letterboxd list`;
+    dl.addEventListener('click', () => {
+      const rows = [['Title', 'Year', 'tmdbID'],
+        ...course.films.map((f) => [f.title, f.year, f.tmdbId]),
+        ...(course.extra?.tmdbId ? [[course.extra.title, course.extra.year, course.extra.tmdbId]] : [])];
+      const csv = rows.map((r) => r.map((x) => `"${String(x ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = `${course.code.replace(/\s+/g, '-')}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    head.appendChild(dl);
     fs.appendChild(head);
     if (course.desc) fs.appendChild(h('p', 'course-desc', course.desc));
     const ul = h('ul', 'diary course-list');
@@ -859,6 +894,14 @@ function secSchool(v, wrap) {
       ul.appendChild(li);
     }
     fs.appendChild(ul);
+    if (course.extra) {
+      const fx = h('p', 'further');
+      fx.appendChild(h('span', 'tick', course.extra.watched ? '✓' : '+'));
+      fx.appendChild(document.createTextNode('further screening: '));
+      fx.appendChild(filmLink(course.extra.tmdbId, `${course.extra.title} (${course.extra.year})`));
+      fx.appendChild(document.createTextNode(` — ${course.extra.why}`));
+      fs.appendChild(fx);
+    }
     if (course.complete) {
       fs.appendChild(h('p', 'course-crit',
         `✓ Course complete${course.grade ? ` — ${course.grade}${course.honors ? ', dean’s list' : ''}` : ''}. Crit session: ${course.assignment}`));
