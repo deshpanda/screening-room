@@ -37,6 +37,19 @@ maintain.
    the secret if you change it).
 3. `git add data/ && git commit -m "Refresh vault" && git push`
 
+## Two-seater mode (dormant, for the future)
+
+When there's someone to share the room with: get their Letterboxd export,
+unzip it locally (e.g. `export-them/`, gitignored like yours), then build with
+
+```sh
+TMDB_KEY=xxx node tools/build-vault.mjs ./export --second ./export-them --second-name "R"
+```
+
+The Next page gains a "Two-seater" shelf — films neither of you has seen,
+seeded by what you both loved — plus films-in-common and a taste-correlation
+score. Leave `--second` off and the section simply doesn't exist.
+
 ## Rotating the passphrase
 
 Re-run the full rebuild with a new passphrase (the TMDB cache makes it fast),

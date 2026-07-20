@@ -158,22 +158,27 @@ export async function buildRecs(src, key) {
   const topGenres = [...genreCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => g);
 
   // ---- canon directors ------------------------------------------------------
-  async function directorBest(name, excludeSet) {
+  async function directorFilms(name, excludeSet, n = 1) {
     const p = await tmdb('/search/person', { query: name }, key);
     await sleep(90);
     const person = p?.results?.[0];
-    if (!person) return null;
+    if (!person) return [];
     const credits = await tmdb(`/person/${person.id}/movie_credits`, {}, key);
     await sleep(90);
-    const directed = (credits?.crew || [])
+    return (credits?.crew || [])
       .filter((c) => c.job === 'Director' && (c.vote_count || 0) >= 400)
       .filter((c) => !excludeSet.has(c.id) && !excludeSet.has(`${normTitle(c.title)} ${yearOf(c.release_date)}`))
-      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-    if (!directed.length) return null;
-    const best = directed[0];
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))
+      .slice(0, n)
+      .map((c) => ({ id: c.id, title: c.title, year: yearOf(c.release_date), vote_average: c.vote_average, vote_count: c.vote_count, poster_path: c.poster_path, genre_ids: c.genre_ids }));
+  }
+
+  async function directorBest(name, excludeSet) {
+    const [best] = await directorFilms(name, excludeSet, 1);
+    if (!best) return null;
     const genreNames = (best.genre_ids || []).map((g) => TMDB_GENRES[g]).filter(Boolean);
     return {
-      film: { id: best.id, title: best.title, year: yearOf(best.release_date), vote_average: best.vote_average, vote_count: best.vote_count, poster_path: best.poster_path },
+      film: best,
       affinity: genreAffinity(topGenres, genreNames) * ((best.vote_average || 0) / 10),
     };
   }
@@ -279,6 +284,62 @@ export async function buildRecs(src, key) {
   }
   franchises.sort((a, b) => (b.seen / b.total) - (a.seen / a.total) || b.seen - a.seen);
 
+  // ---- master spotlight: one rotating retrospective per refresh -----------------
+  // Deterministic rotation by build week, so every Mon/Thu print can feature
+  // someone new without any stored state.
+  let spotlight = null;
+  {
+    const week = Math.floor(Date.now() / (7 * 86400000));
+    for (let probe = 0; probe < 6 && !spotlight; probe++) {
+      const name = CANON_DIRECTORS[(week + probe) % CANON_DIRECTORS.length];
+      const filmsTop = (await directorFilms(name, exclude, 3)).filter((f) => (f.vote_average || 0) >= 7.0);
+      if (filmsTop.length >= 2) spotlight = { name, films: filmsTop };
+    }
+  }
+
+  // ---- terra incognita: fill the emptiest genre × decade cells -------------------
+  const GENRE_IDS = Object.fromEntries(Object.entries(TMDB_GENRES).map(([id, name]) => [name, +id]));
+  const decCount = new Map();
+  const gdCount = new Map();
+  for (const [k, f] of Object.entries(films)) {
+    const year = k.split('|')[1];
+    const dec = year && year.length === 4 ? Math.floor(+year / 10) * 10 : null;
+    if (!dec) continue;
+    decCount.set(dec, (decCount.get(dec) || 0) + 1);
+    for (const g of f.genres || []) gdCount.set(`${g}|${dec}`, (gdCount.get(`${g}|${dec}`) || 0) + 1);
+  }
+  const gapPicks = [];
+  {
+    const gaps = [];
+    for (const g of topGenres.slice(0, 6)) {
+      for (let dec = 1950; dec <= 2010; dec += 10) {
+        const n = gdCount.get(`${g}|${dec}`) || 0;
+        if (n === 0) gaps.push({ g, dec });
+      }
+    }
+    // prefer the owner's stronger genres and the great middle decades
+    gaps.sort((a, b) => topGenres.indexOf(a.g) - topGenres.indexOf(b.g)
+      || Math.abs(1975 - a.dec) - Math.abs(1975 - b.dec));
+    for (const gap of gaps.slice(0, 4)) {
+      const d = await tmdb('/discover/movie', {
+        with_genres: GENRE_IDS[gap.g], sort_by: 'vote_average.desc',
+        'vote_count.gte': gap.dec < 1970 ? 300 : 500,
+        'primary_release_date.gte': `${gap.dec}-01-01`,
+        'primary_release_date.lte': `${gap.dec + 9}-12-31`,
+      }, key);
+      await sleep(90);
+      const hit = (d?.results || []).find((r) =>
+        !exclude.has(r.id) && !exclude.has(`${normTitle(r.title)} ${yearOf(r.release_date)}`));
+      if (hit) {
+        gapPicks.push({
+          id: hit.id, title: hit.title, year: yearOf(hit.release_date),
+          vote_average: hit.vote_average, vote_count: hit.vote_count, poster_path: hit.poster_path,
+          gapLabel: `${gap.g}, the ${gap.dec}s — unexplored`,
+        });
+      }
+    }
+  }
+
   // ---- watchlist, ranked ------------------------------------------------------
   const watchlistCards = [];
   for (const w of watchlist.slice(0, 12)) {
@@ -303,10 +364,21 @@ export async function buildRecs(src, key) {
     ),
     moreFrom: await toCards(moreFrom.map((m) => ({ ...m.film, director: m.name })), key, (it) => `more ${it.director}`),
     faces: await toCards(faces.map((f) => ({ ...f, id: f.id })), key, (it) => `more ${it.actor}`),
+    gapFillers: await toCards(gapPicks, key, (it) => it.gapLabel),
     watchlistFirst: await toCards(watchlistCards.slice(0, 10), key, () => 'already on your list'),
   };
+  if (spotlight) {
+    shelves.spotlight = {
+      name: spotlight.name,
+      films: await toCards(spotlight.films, key, () => `a ${spotlight.name} picture`),
+    };
+  }
 
-  const joinGroups = [...Object.values(shelves), pool];
+  const joinGroups = [pool];
+  for (const g of Object.values(shelves)) {
+    if (Array.isArray(g)) joinGroups.push(g);
+    else if (g?.films) joinGroups.push(g.films); // the spotlight
+  }
   const need = new Set();
   for (const group of joinGroups) for (const c of group) if (c.imdbId) need.add(c.imdbId);
   const ratingsMap = await imdbRatings(need);
@@ -337,7 +409,85 @@ export async function buildRecs(src, key) {
     .map((name) => ({ name, seen: watchedDirectorsCount.get(name) || 0 }))
     .sort((a, b) => b.seen - a.seen || a.name.localeCompare(b.name));
 
-  const total = Object.values(shelves).reduce((s, x) => s + x.length, 0);
-  console.log(`  recs: ${total} cards+rows across ${Object.keys(shelves).length} groups (IMDb joined for ${ratingsMap.size}, ${franchises.length} unfinished franchises).`);
+  const total = Object.values(shelves)
+    .reduce((s, x) => s + (Array.isArray(x) ? x.length : (x?.films?.length || 0)), 0);
+  buildRecs._lastKey = key; // reused by the optional two-seater pass
+  console.log(`  recs: ${total} cards+rows across ${Object.keys(shelves).length} groups (IMDb joined for ${ratingsMap.size}, ${franchises.length} unfinished franchises${shelves.spotlight ? `, spotlight: ${shelves.spotlight.name}` : ''}).`);
   return shelves;
+}
+
+// ---------------------------------------------------------------------------
+// Two-seater (dormant until used): build a joint shelf from a second person's
+// export. `node tools/build-vault.mjs ./export --second ./export-them
+// --second-name "R"` — films neither has seen, seeded by what BOTH loved,
+// plus overlap stats. Renders on the Next page only when present.
+// ---------------------------------------------------------------------------
+export async function buildTwoSeater(src1, src2, name2, key) {
+  const { seedWeight, aggregate, normTitle } = await import('../lib/recs.js');
+  const { filmKey } = await import('../lib/insights.js');
+
+  const norm = (w) => `${normTitle(w.name)} ${w.year}`;
+  const aWatched = new Set([...(src1.watched || []), ...(src1.diary || [])].map(norm));
+  const bWatched = new Set([...(src2.watched || []), ...(src2.diary || [])].map(norm));
+
+  // overlap stats
+  let common = 0;
+  for (const k of bWatched) if (aWatched.has(k)) common++;
+  const aR = new Map((src1.ratings || []).map((r) => [norm(r), r.rating]));
+  const shared = (src2.ratings || []).filter((r) => aR.has(norm(r)));
+  let corr = null;
+  if (shared.length >= 8) {
+    const xs = shared.map((r) => aR.get(norm(r)));
+    const ys = shared.map((r) => r.rating);
+    const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+    const mx = mean(xs); const my = mean(ys);
+    let num = 0; let dx = 0; let dy = 0;
+    for (let i = 0; i < xs.length; i++) {
+      num += (xs[i] - mx) * (ys[i] - my);
+      dx += (xs[i] - mx) ** 2;
+      dy += (ys[i] - my) ** 2;
+    }
+    corr = dx && dy ? Math.round((num / Math.sqrt(dx * dy)) * 100) / 100 : null;
+  }
+
+  // seeds loved by either (shared loves weigh double via both entries)
+  const films1 = src1.films || {};
+  const seeds = [];
+  for (const r of (src1.ratings || [])) {
+    const f = films1[filmKey(r.name, r.year)];
+    if (f?.tmdbId && seedWeight(r.rating) >= 1) seeds.push({ name: r.name, tmdbId: f.tmdbId, weight: seedWeight(r.rating) });
+  }
+  let searched = 0;
+  for (const r of (src2.ratings || [])) {
+    if (seedWeight(r.rating) < 1.5 || searched >= 15) continue;
+    const k = filmKey(r.name, r.year);
+    const f = films1[k];
+    if (f?.tmdbId) { seeds.push({ name: r.name, tmdbId: f.tmdbId, weight: seedWeight(r.rating) }); continue; }
+    const s = await tmdb('/search/movie', { query: r.name, primary_release_year: r.year || '' }, key);
+    await sleep(90);
+    searched++;
+    if (s?.results?.[0]) seeds.push({ name: r.name, tmdbId: s.results[0].id, weight: seedWeight(r.rating) });
+  }
+  seeds.sort((a, b) => b.weight - a.weight);
+
+  const exclude = new Set([...aWatched, ...bWatched,
+    ...(src1.watchlist || []).map(norm), ...(src2.watchlist || []).map(norm)]);
+  const lists = [];
+  for (const s of seeds.slice(0, 40)) {
+    const r = await tmdb(`/movie/${s.tmdbId}/recommendations`, {}, key);
+    await sleep(90);
+    lists.push({
+      seed: { title: s.name, weight: s.weight },
+      items: (r?.results || []).map((it) => ({
+        id: it.id, title: it.title, year: (it.release_date || '').slice(0, 4),
+        vote_average: it.vote_average, vote_count: it.vote_count, poster_path: it.poster_path,
+      })),
+    });
+  }
+  const top = aggregate(lists, { exclude, limit: 16 })
+    .filter((c) => (c.vote_average || 0) >= 7.2)
+    .slice(0, 12);
+  const cards = await toCards(top, key, (it) => (it.seeds?.length ? `for both of you · via ${it.seeds[0]}` : 'for both of you'));
+  cards.forEach((c) => delete c.imdbId);
+  return { name2, stats: { common, corr }, cards };
 }

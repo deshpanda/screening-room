@@ -327,6 +327,29 @@ button.chip { font: inherit; font-size: 0.85rem; cursor: pointer; }
 .yr-num .v { font-size: 1.8rem; font-weight: 800; margin: 0; font-variant-numeric: tabular-nums; }
 .yr-num .k { font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: 2px 0 0; }
 
+/* master spotlight */
+.spotlight {
+  border: 1px solid var(--amber-dim); border-radius: 8px;
+  background: var(--surface-2); padding: 16px 16px 6px; margin: 0 0 22px;
+}
+.spot-k {
+  font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--amber); margin: 0 0 2px;
+}
+.spot-name { font-size: 1.5rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; margin: 0 0 12px; }
+
+/* terra incognita matrix */
+.matrix-panel { overflow-x: auto; }
+.matrix { display: grid; gap: 4px; min-width: 560px; align-items: center; }
+.mx-head { font-family: var(--mono); font-size: 0.64rem; color: var(--muted); text-align: center; letter-spacing: 0.06em; }
+.mx-label { font-size: 0.8rem; color: var(--text); padding-right: 8px; white-space: nowrap; }
+.mx-cell {
+  font-family: var(--mono); font-size: 0.68rem; text-align: center;
+  padding: 6px 0; border-radius: 4px; color: var(--text);
+  border: 1px solid var(--line);
+}
+.mx-cell.zero { color: var(--faint); border-style: dashed; }
+
 /* double feature */
 .df-pair { display: flex; gap: 16px; flex-wrap: wrap; }
 .df-note {

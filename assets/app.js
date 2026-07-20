@@ -313,6 +313,32 @@ function secTaste(v, wrap) {
   wrap.appendChild(taste);
 }
 
+function secGaps(v, wrap) {
+  const m = v.genreDecadeMatrix;
+  if (!m) return;
+  const gaps = block('Terra incognita', 'genre × decade — the blanks are the point');
+  const panel = h('div', 'panel matrix-panel');
+  const grid = h('div', 'matrix');
+  grid.style.gridTemplateColumns = `minmax(96px, auto) repeat(${m.decades.length}, 1fr)`;
+  grid.appendChild(h('span', 'mx-head', ''));
+  for (const d of m.decades) grid.appendChild(h('span', 'mx-head', d.slice(2)));
+  const max = Math.max(1, ...m.cells.flat());
+  m.genres.forEach((g, gi) => {
+    grid.appendChild(h('span', 'mx-label', g));
+    m.decades.forEach((d, di) => {
+      const n = m.cells[gi][di];
+      const cell = h('span', 'mx-cell' + (n ? '' : ' zero'), n ? String(n) : '·');
+      if (n) cell.style.background = `rgba(230, 166, 72, ${0.12 + 0.5 * (n / max)})`;
+      cell.title = `${g}, the ${d} — ${n} film${n === 1 ? '' : 's'}`;
+      grid.appendChild(cell);
+    });
+  });
+  panel.appendChild(grid);
+  panel.appendChild(h('p', 'hint-line', 'the emptiest cells feed the terra incognita shelf on the next page'));
+  gaps.appendChild(panel);
+  wrap.appendChild(gaps);
+}
+
 function secPeople(v, wrap) {
   if (!v.directors.length && !v.actors.length) return;
   const people = block('The men behind the camera', 'and in front of it');
@@ -453,6 +479,7 @@ const SHELVES = [
   ['mastersProgress', 'Masters in progress'],
   ['moreFrom', 'More from directors you love'],
   ['faces', 'Follow the faces'],
+  ['gapFillers', 'Terra incognita — where you’ve never been'],
   ['watchlistFirst', 'Off your watchlist first'],
 ];
 
@@ -484,6 +511,17 @@ function buildCard(c, eager = false, big = false) {
 function secNext(v, wrap) {
   if (!v.recs) return;
   const rx = block('The next pictures', 'TMDB’s engine, weighted by your ratings');
+
+  // master spotlight — this refresh's retrospective
+  if (v.recs.spotlight?.films?.length) {
+    const sp = h('div', 'spotlight');
+    sp.appendChild(h('p', 'spot-k', 'Master spotlight · this print'));
+    sp.appendChild(h('h4', 'spot-name', v.recs.spotlight.name));
+    const row = h('div', 'shelf');
+    v.recs.spotlight.films.forEach((c) => row.appendChild(buildCard(c, true)));
+    sp.appendChild(row);
+    rx.appendChild(sp);
+  }
 
   // tonight's pick — one film, no scrolling, no debate
   const allCards = [];
@@ -523,6 +561,15 @@ function secNext(v, wrap) {
     btn.type = 'button';
     const dfBtn = h('button', 'btn', 'Double feature');
     dfBtn.type = 'button';
+    const hrs = h('select');
+    for (const [val, label] of [['4', '4 hours'], ['6', '6 hours'], ['8', '8 hours'], ['10', '10 hours']]) {
+      const o = h('option', null, label);
+      o.value = val;
+      if (val === '6') o.selected = true;
+      hrs.appendChild(o);
+    }
+    const wkBtn = h('button', 'btn', 'Programme my weekend');
+    wkBtn.type = 'button';
     const slot = h('div', 'tonight-slot');
 
     btn.addEventListener('click', () => {
@@ -571,11 +618,43 @@ function secNext(v, wrap) {
       slot.appendChild(df);
     });
 
+    // the weekend programme: chain films by pairing affinity into a time budget
+    wkBtn.addEventListener('click', () => {
+      const budget = +hrs.value * 60;
+      const pool = filterPool().filter((c) => c.runtime > 0);
+      slot.innerHTML = '';
+      if (!pool.length) { slot.appendChild(h('p', 'why', 'nothing on the shelves for that mood — loosen a filter')); return; }
+      const programme = [];
+      let remaining = budget;
+      let current = pool[Math.floor(Math.random() * pool.length)];
+      while (current && programme.length < 4) {
+        programme.push(current);
+        remaining -= current.runtime;
+        const rest = pool.filter((c) => c.runtime <= remaining && !programme.some((p) => p.tmdbId === c.tmdbId));
+        if (!rest.length) break;
+        const last = programme[programme.length - 1];
+        const best = Math.max(...rest.map((c) => pairScore(last, c)));
+        const cands = rest.filter((c) => pairScore(last, c) === best);
+        current = cands[Math.floor(Math.random() * cands.length)];
+      }
+      const total = programme.reduce((s, c) => s + c.runtime, 0);
+      const df = h('div', 'df');
+      const pair = h('div', 'df-pair');
+      programme.forEach((c) => pair.appendChild(buildCard(c, true, true)));
+      df.appendChild(pair);
+      df.appendChild(h('p', 'df-note',
+        `the ${hrs.value}-hour programme — ${programme.length} film${programme.length === 1 ? '' : 's'} · ` +
+        `${Math.floor(total / 60)}h ${total % 60}m of the ${hrs.value}h budget`));
+      slot.appendChild(df);
+    });
+
     bar.appendChild(h('span', 'tonight-label', 'What do I watch tonight?'));
     bar.appendChild(sel);
     bar.appendChild(dec);
     bar.appendChild(btn);
     bar.appendChild(dfBtn);
+    bar.appendChild(hrs);
+    bar.appendChild(wkBtn);
     rx.appendChild(bar);
     rx.appendChild(slot);
   }
@@ -601,6 +680,19 @@ function secNext(v, wrap) {
     rx.appendChild(head);
     const shelf = h('div', 'shelf');
     cards.forEach((c, ci) => shelf.appendChild(buildCard(c, ci < 4)));
+    rx.appendChild(shelf);
+  }
+
+  // two-seater — appears only when a vault was built with a second export
+  if (v.recs.twoSeater?.cards?.length) {
+    const ts = v.recs.twoSeater;
+    rx.appendChild(h('h4', 'shelf-label', `Two-seater — with ${ts.name2}`));
+    if (ts.stats) {
+      rx.appendChild(h('p', 'hint-line',
+        `${ts.stats.common} films in common · ${ts.stats.corr !== null ? `taste correlation ${ts.stats.corr}` : 'not enough shared ratings yet'}`));
+    }
+    const shelf = h('div', 'shelf');
+    ts.cards.forEach((c, ci) => shelf.appendChild(buildCard(c, ci < 4)));
     rx.appendChild(shelf);
   }
 
@@ -739,7 +831,7 @@ function secArchive(v, wrap) {
 // ---------- page assembly ----------
 const PAGES = {
   overview: [secHero, secTiles, secReel, secRecent],
-  stats: [secYears, secHabits, secTaste, secPeople, secRange, secVerdicts, secYearReview],
+  stats: [secYears, secHabits, secTaste, secGaps, secPeople, secRange, secVerdicts, secYearReview],
   next: [secNext],
   archive: [secThisWeek, secArchive],
 };

@@ -213,8 +213,17 @@ console.log(`Insights computed: ${insights.totals.uniqueFilms} films, ${insights
 
 if (!flag('--demo') && !flag('--no-recs') && process.env.TMDB_KEY) {
   console.log('Building recommendation shelves…');
-  const { buildRecs } = await import('./recs-build.mjs');
+  const { buildRecs, buildTwoSeater } = await import('./recs-build.mjs');
   insights.recs = await buildRecs(data, process.env.TMDB_KEY);
+
+  // Optional second seat: --second <their-export-dir> --second-name "R"
+  const secondDir = opt('--second', null);
+  if (secondDir) {
+    console.log('Building the two-seater shelf…');
+    insights.recs.twoSeater = await buildTwoSeater(
+      data, loadExport(secondDir), opt('--second-name', 'the second seat'), process.env.TMDB_KEY,
+    );
+  }
 } else if (!flag('--demo')) {
   console.log('Skipping recommendations (no TMDB_KEY or --no-recs).');
 }
