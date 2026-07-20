@@ -11,6 +11,7 @@ import {
   h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block,
   resetBlockCounter, scatterChart,
 } from '../lib/render.js';
+import { READING_SHELF } from '../lib/recs.js';
 
 const PAGE = document.body.dataset.page || 'overview';
 const BASE = PAGE === 'overview' ? '' : '../';
@@ -794,15 +795,29 @@ function secSchool(v, wrap) {
     wrap.appendChild(sp);
   }
 
-  // the transcript
-  const fs = block('Film school', `${school.done} of ${school.total} screened`);
+  // the transcript header
+  const fs = block('Film school', 'a four-year program');
+  const tr = h('div', 'tiles transcript');
+  tr.appendChild(tile('Standing', school.standing || '—'));
+  tr.appendChild(tile('Screened', `${school.done}/${school.total}`, null, { animate: false }));
+  tr.appendChild(tile('GPA', school.gpa ? `${school.gpa}` : '—', school.gpaLetter ? `that’s ${/^A/.test(school.gpaLetter) ? 'an' : 'a'} ${school.gpaLetter}` : 'no graded credits yet'));
+  fs.appendChild(tr);
+
+  const YEAR_NAMES = { 1: 'Year One — foundations', 2: 'Year Two — movements', 3: 'Year Three — genre & form', 4: 'Year Four — advanced studies' };
+  let lastYear = null;
   for (const course of school.courses) {
+    if (course.year !== lastYear) {
+      lastYear = course.year;
+      fs.appendChild(h('h4', 'school-year', YEAR_NAMES[course.year] || `Year ${course.year}`));
+    }
     const doneHere = course.films.filter((f) => f.watched).length;
     const head = h('div', 'course-head');
     head.appendChild(h('h4', 'course-code', course.code));
     head.appendChild(h('span', 'course-title', course.title));
+    if (course.grade) head.appendChild(h('span', 'course-grade', course.grade));
     head.appendChild(h('span', 'course-score', `${doneHere}/${course.films.length}`));
     fs.appendChild(head);
+    if (course.desc) fs.appendChild(h('p', 'course-desc', course.desc));
     const ul = h('ul', 'diary course-list');
     for (const f of course.films) {
       const li = h('li', f.watched ? 'screened' : '');
@@ -813,12 +828,33 @@ function secSchool(v, wrap) {
       t.appendChild(h('span', 'y', `(${f.year})`));
       li.appendChild(t);
       li.appendChild(h('span', 'why-inline', f.why));
-      if (f.tmdb) li.appendChild(h('span', 'extra', `${f.tmdb} tmdb`));
+      if (f.userRating) li.appendChild(h('span', 'stars', stars(f.userRating)));
+      else if (f.tmdb) li.appendChild(h('span', 'extra', `${f.tmdb} tmdb`));
       ul.appendChild(li);
     }
     fs.appendChild(ul);
+    if (course.assignment) fs.appendChild(h('p', 'course-assign', `Assignment — ${course.assignment}`));
   }
   wrap.appendChild(fs);
+
+  // the reading shelf
+  const rs = block('The reading shelf', 'what the good programs assign');
+  const rp = h('div', 'panel');
+  const rl = h('ul', 'diary');
+  for (const [title, author, note] of READING_SHELF) {
+    const li = h('li');
+    const t = h('span', 't');
+    const b = h('span', null, title);
+    b.style.fontWeight = '600';
+    t.appendChild(b);
+    t.appendChild(h('span', 'y', ` — ${author}`));
+    li.appendChild(t);
+    li.appendChild(h('span', 'why-inline', note));
+    rl.appendChild(li);
+  }
+  rp.appendChild(rl);
+  rs.appendChild(rp);
+  wrap.appendChild(rs);
 }
 
 // ---------- sections: archive ----------

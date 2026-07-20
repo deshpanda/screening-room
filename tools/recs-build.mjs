@@ -409,19 +409,37 @@ export async function buildRecs(src, key) {
     .map((name) => ({ name, seen: watchedDirectorsCount.get(name) || 0 }))
     .sort((a, b) => b.seen - a.seen || a.name.localeCompare(b.name));
 
-  // Film school: resolve the syllabus against TMDB, mark what's screened.
+  // Film school: resolve the syllabus against TMDB, grade the transcript.
   console.log('  recs: grading the film-school transcript…');
+  // the owner's rating per film, reachable by TMDB id or normalized title
+  const ratingByTmdbId = new Map();
+  const ratingByNorm = new Map();
+  for (const [k, f] of Object.entries(films)) {
+    const [name, year] = k.split('|');
+    const r = ratingByKey.get(k);
+    if (!r) continue;
+    if (f.tmdbId) ratingByTmdbId.set(f.tmdbId, r);
+    ratingByNorm.set(normTitle(name), r);
+  }
+  const letterOf = (gpa) => (gpa >= 3.7 ? 'A' : gpa >= 3.3 ? 'A-' : gpa >= 3.0 ? 'B+' : gpa >= 2.7 ? 'B' : gpa >= 2.3 ? 'B-' : 'C');
+
   const school = { courses: [], done: 0, total: 0 };
+  const allGrades = [];
   for (const course of SYLLABUS) {
     const courseFilms = [];
+    const courseGrades = [];
     for (const [title, year, why] of course.films) {
       let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
       if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
       await sleep(80);
       const hit = s?.results?.[0];
       const watched = (hit && exclude.has(hit.id)) || exclude.has(`${normTitle(title)} ${year}`);
+      const userRating = watched
+        ? (hit && ratingByTmdbId.get(hit.id)) || ratingByNorm.get(normTitle(title)) || null
+        : null;
+      if (userRating) { courseGrades.push(userRating); allGrades.push(userRating); }
       courseFilms.push({
-        title, year, why, watched,
+        title, year, why, watched, userRating,
         tmdbId: hit?.id || null,
         poster: hit?.poster_path || null,
         tmdb: hit?.vote_average ? Math.round(hit.vote_average * 10) / 10 : null,
@@ -429,8 +447,21 @@ export async function buildRecs(src, key) {
       school.total++;
       if (watched) school.done++;
     }
-    school.courses.push({ code: course.code, title: course.title, films: courseFilms });
+    const avg = courseGrades.length ? courseGrades.reduce((a, b) => a + b, 0) / courseGrades.length : null;
+    school.courses.push({
+      code: course.code, title: course.title, year: course.year,
+      desc: course.desc, assignment: course.assignment,
+      grade: avg !== null ? letterOf((avg / 5) * 4) : null,
+      films: courseFilms,
+    });
   }
+  if (allGrades.length) {
+    const g = (allGrades.reduce((a, b) => a + b, 0) / allGrades.length / 5) * 4;
+    school.gpa = Math.round(g * 100) / 100;
+    school.gpaLetter = letterOf(g);
+  }
+  const pct = school.done / school.total;
+  school.standing = pct >= 1 ? 'Graduate' : pct >= 0.75 ? 'Senior' : pct >= 0.5 ? 'Junior' : pct >= 0.25 ? 'Sophomore' : 'Freshman';
   shelves.school = school;
 
   // Season pass: the four-week term plan, cut fresh with every print.

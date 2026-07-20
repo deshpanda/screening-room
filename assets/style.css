@@ -394,9 +394,24 @@ a.spot-name:hover { color: var(--amber); }
   font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--amber); margin: 0; max-width: 150px;
 }
+.transcript { margin-bottom: 6px; }
+.school-year {
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber);
+  border-bottom: 1px solid var(--line); padding-bottom: 8px; margin: 34px 0 4px;
+}
 .course-head {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
   margin: 26px 0 6px;
+}
+.course-grade {
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 700; color: #14100a;
+  background: var(--amber); border-radius: 3px; padding: 1px 7px;
+}
+.course-desc { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; max-width: 72ch; }
+.course-assign {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--faint);
+  letter-spacing: 0.04em; margin: 8px 0 0; font-style: italic;
 }
 .course-code { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); margin: 0; letter-spacing: 0.14em; }
 .course-title { font-weight: 700; }
