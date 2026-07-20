@@ -917,8 +917,10 @@ function secThisWeek(v, wrap) {
 
 function secArchive(v, wrap) {
   if (!v.ledger || !v.ledger.length) return;
-  const ar = block('The archive', `${v.ledger.length} screenings`);
+  const ar = block('The archive', 'the ledger & the margins');
+  const twoCol = h('div', 'grid2 archive-cols');
   const pa2 = h('div', 'panel');
+  pa2.appendChild(h('h4', null, `The ledger — ${v.ledger.length} screenings`));
   const filt = h('div', 'archive-filter');
   const inp = h('input');
   inp.type = 'search';
@@ -1024,14 +1026,17 @@ function secArchive(v, wrap) {
   rwBox.addEventListener('change', applyFilter);
   applyFilter();
 
-  ar.appendChild(pa2);
+  twoCol.appendChild(pa2);
+  const margins = buildMargins(v);
+  if (margins) twoCol.appendChild(margins);
+  ar.appendChild(twoCol);
   wrap.appendChild(ar);
 }
 
-function secReviews(v, wrap) {
-  if (!v.reviews || !v.reviews.length) return;
-  const mb = block('The margins', `${v.reviews.length} review${v.reviews.length === 1 ? '' : 's'}, in your own hand`);
+function buildMargins(v) {
+  if (!v.reviews || !v.reviews.length) return null;
   const panel = h('div', 'panel');
+  panel.appendChild(h('h4', null, `The margins — ${v.reviews.length} review${v.reviews.length === 1 ? '' : 's'}, in your own hand`));
   const filt = h('div', 'archive-filter');
   const inp = h('input');
   inp.type = 'search';
@@ -1039,6 +1044,8 @@ function secReviews(v, wrap) {
   inp.setAttribute('aria-label', 'Search reviews');
   filt.appendChild(inp);
   panel.appendChild(filt);
+
+  const CLAMP = 420;
   const list = h('div');
   const cards = v.reviews.map((r) => {
     const card = h('div', 'review');
@@ -1048,18 +1055,71 @@ function secReviews(v, wrap) {
     head.appendChild(filmLink(r.tid, `${r.t} (${r.y})`));
     if (r.r) head.appendChild(h('span', 'stars', ' ' + stars(r.r)));
     card.appendChild(head);
-    card.appendChild(h('p', 'review-text', r.text));
+    // long reviews fold, so one essay can't fill the column
+    if (r.text.length > CLAMP) {
+      const cut = r.text.lastIndexOf(' ', CLAMP);
+      const body = h('p', 'review-text', r.text.slice(0, cut > 0 ? cut : CLAMP) + '… ');
+      const moreBtn = h('button', 'read-more', 'read on');
+      moreBtn.type = 'button';
+      let open = false;
+      moreBtn.addEventListener('click', () => {
+        open = !open;
+        body.textContent = (open ? r.text : r.text.slice(0, cut > 0 ? cut : CLAMP) + '… ') + ' ';
+        body.appendChild(moreBtn);
+        moreBtn.textContent = open ? 'fold' : 'read on';
+      });
+      body.appendChild(moreBtn);
+      card.appendChild(body);
+    } else {
+      card.appendChild(h('p', 'review-text', r.text));
+    }
     card.dataset.q = (r.t + ' ' + r.y + ' ' + r.text).toLowerCase();
     list.appendChild(card);
     return card;
   });
   panel.appendChild(list);
-  inp.addEventListener('input', () => {
+
+  const foot = h('div', 'archive-foot');
+  const count = h('p', 'archive-count', '');
+  const btns = h('div', 'archive-btns');
+  const more = h('button', 'btn', 'Show more');
+  const less = h('button', 'btn', 'Show less');
+  more.type = 'button';
+  less.type = 'button';
+  btns.appendChild(less);
+  btns.appendChild(more);
+  foot.appendChild(count);
+  foot.appendChild(btns);
+  panel.appendChild(foot);
+
+  const PAGE_SIZE = 10;
+  let cap = PAGE_SIZE;
+  function apply() {
     const q = inp.value.trim().toLowerCase();
-    for (const c of cards) c.style.display = !q || c.dataset.q.includes(q) ? '' : 'none';
+    let matches = 0;
+    let shown = 0;
+    for (const c of cards) {
+      const hit = !q || c.dataset.q.includes(q);
+      if (hit) matches++;
+      const show = hit && (q ? true : shown < cap);
+      if (show) shown++;
+      c.style.display = show ? '' : 'none';
+    }
+    more.style.display = !q && cap < cards.length ? '' : 'none';
+    less.style.display = !q && cap > PAGE_SIZE ? '' : 'none';
+    count.textContent = q
+      ? `${matches} match${matches === 1 ? '' : 'es'} of ${cards.length}`
+      : `showing ${Math.min(cap, cards.length)} of ${cards.length}`;
+  }
+  more.addEventListener('click', () => { cap += 25; apply(); });
+  less.addEventListener('click', () => {
+    cap = PAGE_SIZE;
+    apply();
+    panel.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'start' });
   });
-  mb.appendChild(panel);
-  wrap.appendChild(mb);
+  inp.addEventListener('input', apply);
+  apply();
+  return panel;
 }
 
 // ---------- page assembly ----------
@@ -1068,7 +1128,7 @@ const PAGES = {
   stats: [secYears, secHabits, secTaste, secGaps, secPeople, secRange, secVerdicts, secYearReview],
   next: [secNext],
   school: [secSchool],
-  archive: [secThisWeek, secReviews, secArchive],
+  archive: [secThisWeek, secArchive],
 };
 
 function renderPage(v) {

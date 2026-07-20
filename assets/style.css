@@ -444,6 +444,13 @@ a.spot-name:hover { color: var(--amber); }
 .rw-filter { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
 
 /* the margins — reviews */
+.archive-cols { align-items: start; }
+.read-more {
+  font: inherit; font-family: var(--mono); font-size: 0.68rem; cursor: pointer;
+  color: var(--amber); background: none; border: none; padding: 0;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.read-more:hover { text-decoration: underline; }
 .review { border-bottom: 1px dashed var(--line); padding: 14px 0; }
 .review:last-child { border-bottom: 0; }
 .review-head { margin: 0 0 6px; font-size: 0.92rem; }
