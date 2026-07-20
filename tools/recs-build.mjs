@@ -332,6 +332,11 @@ export async function buildRecs(src, key) {
 
   shelves.franchises = franchises.slice(0, 8);
 
+  // The canon board: every master, with how far in the owner is.
+  shelves.canon = CANON_DIRECTORS
+    .map((name) => ({ name, seen: watchedDirectorsCount.get(name) || 0 }))
+    .sort((a, b) => b.seen - a.seen || a.name.localeCompare(b.name));
+
   const total = Object.values(shelves).reduce((s, x) => s + x.length, 0);
   console.log(`  recs: ${total} cards+rows across ${Object.keys(shelves).length} groups (IMDb joined for ${ratingsMap.size}, ${franchises.length} unfinished franchises).`);
   return shelves;

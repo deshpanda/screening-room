@@ -327,6 +327,24 @@ button.chip { font: inherit; font-size: 0.85rem; cursor: pointer; }
 .yr-num .v { font-size: 1.8rem; font-weight: 800; margin: 0; font-variant-numeric: tabular-nums; }
 .yr-num .k { font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: 2px 0 0; }
 
+/* double feature */
+.df-pair { display: flex; gap: 16px; flex-wrap: wrap; }
+.df-note {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--amber);
+  letter-spacing: 0.1em; text-transform: uppercase; margin: 10px 0 0;
+}
+
+/* canon board */
+.canon-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; }
+.canon-cell {
+  display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+  font-size: 0.85rem; color: var(--faint);
+  padding: 4px 0; border-bottom: 1px dashed var(--line);
+}
+.canon-cell.on { color: var(--text); }
+.canon-cell .cc { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); }
+.canon-cell.on .cc { color: var(--amber); font-weight: 700; }
+
 /* scatter + hints */
 .hint-line { font-family: var(--mono); font-size: 0.66rem; color: var(--faint); letter-spacing: 0.06em; margin: 8px 0 0; }
 .scatter-caption { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; }

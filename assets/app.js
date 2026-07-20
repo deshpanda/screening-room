@@ -500,22 +500,82 @@ function secNext(v, wrap) {
       o.value = val;
       sel.appendChild(o);
     }
+    const dec = h('select');
+    {
+      const o = h('option', null, 'any decade');
+      o.value = 'any';
+      dec.appendChild(o);
+      const decades = [...new Set(allCards.map((c) => c.year && `${String(c.year).slice(0, 3)}0s`).filter(Boolean))].sort();
+      for (const d of decades) {
+        const od = h('option', null, d);
+        od.value = d.slice(0, 3);
+        dec.appendChild(od);
+      }
+    }
+    const filterPool = () => {
+      let pool = allCards;
+      if (sel.value === '150+') pool = pool.filter((c) => c.runtime >= 150);
+      else if (sel.value !== 'any') pool = pool.filter((c) => c.runtime > 0 && c.runtime <= +sel.value);
+      if (dec.value !== 'any') pool = pool.filter((c) => String(c.year).slice(0, 3) === dec.value);
+      return pool;
+    };
     const btn = h('button', 'btn', 'Roll the projector');
     btn.type = 'button';
+    const dfBtn = h('button', 'btn', 'Double feature');
+    dfBtn.type = 'button';
     const slot = h('div', 'tonight-slot');
+
     btn.addEventListener('click', () => {
-      let pool;
-      if (sel.value === 'any') pool = allCards;
-      else if (sel.value === '150+') pool = allCards.filter((c) => c.runtime >= 150);
-      else pool = allCards.filter((c) => c.runtime > 0 && c.runtime <= +sel.value);
+      const pool = filterPool();
       slot.innerHTML = '';
-      if (!pool.length) { slot.appendChild(h('p', 'why', 'nothing that length on the shelves — roll another')); return; }
+      if (!pool.length) { slot.appendChild(h('p', 'why', 'nothing on the shelves for that mood — loosen a filter')); return; }
       const pick = pool[Math.floor(Math.random() * pool.length)];
       slot.appendChild(buildCard(pick, true, true));
     });
+
+    // the double feature: an anchor, then the partner it pairs best with
+    const pairScore = (a, b) => {
+      let s = 0;
+      const shared = (a.genres || []).filter((g) => (b.genres || []).includes(g));
+      s += shared.length * 2;
+      const da = Math.floor(+a.year / 10);
+      const db = Math.floor(+b.year / 10);
+      if (da === db) s += 2;
+      else if (Math.abs(da - db) === 1) s += 1;
+      if (a.why && a.why === b.why) s += 3; // same director/actor thread
+      return s;
+    };
+    dfBtn.addEventListener('click', () => {
+      const pool = filterPool();
+      slot.innerHTML = '';
+      if (pool.length < 2) { slot.appendChild(h('p', 'why', 'a double feature needs two — loosen a filter')); return; }
+      const first = pool[Math.floor(Math.random() * pool.length)];
+      const rest = pool.filter((c) => c.tmdbId !== first.tmdbId);
+      const best = Math.max(...rest.map((c) => pairScore(first, c)));
+      const partners = rest.filter((c) => pairScore(first, c) === best);
+      const second = partners[Math.floor(Math.random() * partners.length)];
+      const total = (first.runtime || 0) + (second.runtime || 0);
+      const shared = (first.genres || []).filter((g) => (second.genres || []).includes(g));
+      const personThread = first.why && first.why === second.why && /^(more|↳)/.test(first.why);
+      const thread = personThread ? first.why.replace(/^(more|↳)\s*/, '')
+        : shared.length ? shared.join(' / ')
+        : `${String(first.year).slice(0, 3)}0s`;
+      const df = h('div', 'df');
+      const pair = h('div', 'df-pair');
+      pair.appendChild(buildCard(first, true, true));
+      pair.appendChild(buildCard(second, true, true));
+      df.appendChild(pair);
+      df.appendChild(h('p', 'df-note',
+        `tonight’s programme — paired on ${thread} · ${Math.floor(total / 60)}h ${total % 60}m total` +
+        (total >= 240 ? ' · intermission advised' : '')));
+      slot.appendChild(df);
+    });
+
     bar.appendChild(h('span', 'tonight-label', 'What do I watch tonight?'));
     bar.appendChild(sel);
+    bar.appendChild(dec);
     bar.appendChild(btn);
+    bar.appendChild(dfBtn);
     rx.appendChild(bar);
     rx.appendChild(slot);
   }
@@ -542,6 +602,20 @@ function secNext(v, wrap) {
     const shelf = h('div', 'shelf');
     cards.forEach((c, ci) => shelf.appendChild(buildCard(c, ci < 4)));
     rx.appendChild(shelf);
+  }
+
+  // the canon board — every master, and how far in you are
+  if (v.recs.canon?.length) {
+    const started = v.recs.canon.filter((c) => c.seen > 0).length;
+    rx.appendChild(h('h4', 'shelf-label', `The canon — ${started} of ${v.recs.canon.length} masters started`));
+    const cb = h('div', 'panel canon-board');
+    for (const c of v.recs.canon) {
+      const cell = h('span', 'canon-cell' + (c.seen ? ' on' : ''));
+      cell.appendChild(h('span', 'cn', c.name));
+      cell.appendChild(h('span', 'cc', c.seen ? `×${c.seen}` : '—'));
+      cb.appendChild(cell);
+    }
+    rx.appendChild(cb);
   }
 
   // unfinished business — franchises started but not completed
