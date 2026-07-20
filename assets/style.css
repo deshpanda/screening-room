@@ -413,6 +413,15 @@ a.spot-name:hover { color: var(--amber); }
   font-family: var(--mono); font-size: 0.72rem; color: var(--faint);
   letter-spacing: 0.04em; margin: 8px 0 0; font-style: italic;
 }
+.course-crit {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--amber);
+  letter-spacing: 0.04em; margin: 8px 0 0;
+}
+.course-grade.honors { background: var(--amber); box-shadow: 0 0 0 1.5px var(--amber-dim); }
+.semester {
+  border: 1px solid var(--amber-dim); border-radius: 8px;
+  background: var(--surface-2); padding: 16px 16px 6px; margin: 18px 0 8px;
+}
 .course-code { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); margin: 0; letter-spacing: 0.14em; }
 .course-title { font-weight: 700; }
 .course-score { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); margin-left: auto; }

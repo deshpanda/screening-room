@@ -450,8 +450,11 @@ export async function buildRecs(src, key) {
     const avg = courseGrades.length ? courseGrades.reduce((a, b) => a + b, 0) / courseGrades.length : null;
     school.courses.push({
       code: course.code, title: course.title, year: course.year,
+      level: course.year <= 4 ? 'BA' : 'MFA',
       desc: course.desc, assignment: course.assignment,
       grade: avg !== null ? letterOf((avg / 5) * 4) : null,
+      honors: avg !== null && avg >= 4.5,           // dean's list
+      complete: courseFilms.every((f) => f.watched),
       films: courseFilms,
     });
   }
@@ -460,8 +463,28 @@ export async function buildRecs(src, key) {
     school.gpa = Math.round(g * 100) / 100;
     school.gpaLetter = letterOf(g);
   }
-  const pct = school.done / school.total;
-  school.standing = pct >= 1 ? 'Graduate' : pct >= 0.75 ? 'Senior' : pct >= 0.5 ? 'Junior' : pct >= 0.25 ? 'Sophomore' : 'Freshman';
+  // two-tier standing: the BA years first, then the graduate school
+  const tally = (level) => {
+    const fs = school.courses.filter((c) => c.level === level).flatMap((c) => c.films);
+    return { done: fs.filter((f) => f.watched).length, total: fs.length };
+  };
+  school.ba = tally('BA');
+  school.mfa = tally('MFA');
+  school.deansList = school.courses.filter((c) => c.honors).length;
+  if (school.ba.done < school.ba.total) {
+    const pct = school.ba.done / school.ba.total;
+    school.standing = pct >= 0.75 ? 'Senior' : pct >= 0.5 ? 'Junior' : pct >= 0.25 ? 'Sophomore' : 'Freshman';
+  } else if (school.mfa.done < school.mfa.total) {
+    school.standing = 'MFA candidate';
+  } else {
+    school.standing = 'Doctor of Cinema';
+  }
+  // office hours: the course currently in session (first with an unwatched film)
+  const current = school.courses.find((c) => !c.complete);
+  if (current) {
+    const next = current.films.find((f) => !f.watched && f.tmdbId);
+    school.semester = { code: current.code, title: current.title, desc: current.desc, next: next || null };
+  }
   shelves.school = school;
 
   // Season pass: the four-week term plan, cut fresh with every print.
