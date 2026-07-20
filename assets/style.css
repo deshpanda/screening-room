@@ -259,7 +259,14 @@ section.block { margin: 42px 0; }
 }
 .shelf::-webkit-scrollbar { height: 6px; }
 .shelf::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
-.pcard { scroll-snap-align: start; }
+.pcard { scroll-snap-align: start; display: block; text-decoration: none; color: inherit; }
+a.pcard:hover .t { color: var(--amber); }
+
+/* film links — quiet until hovered */
+.film-link { color: inherit; text-decoration: none; border-bottom: 1px dotted transparent; }
+.film-link:hover { color: var(--amber); border-bottom-color: var(--amber-dim); text-decoration: none; }
+a.chip { text-decoration: none; }
+a.chip:hover { border-color: var(--amber); color: var(--amber); }
 .pcard img, .noposter {
   width: 100%; aspect-ratio: 2 / 3; object-fit: cover; display: block;
   border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2);

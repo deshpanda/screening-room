@@ -9,6 +9,17 @@ import { h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block,
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const YEAR_WEEKS = 54; // one shared grid for every year strip
 
+// Letterboxd's stable per-TMDB-id redirect — links a film without knowing its slug.
+const lbUrl = (tid) => `https://letterboxd.com/tmdb/${tid}`;
+function filmLink(tid, text, cls) {
+  if (!tid) return h('span', cls, text);
+  const a = h('a', cls ? cls + ' film-link' : 'film-link', text);
+  a.href = lbUrl(tid);
+  a.target = '_blank';
+  a.rel = 'noopener';
+  return a;
+}
+
 const KEY_SLOT = 'sr-key';
 const root = document.getElementById('root');
 let envelope = null;
@@ -221,7 +232,13 @@ function renderDashboard(v) {
     if (v.rewatchTop && v.rewatchTop.length) {
       const pc2 = h('div', 'panel');
       pc2.appendChild(h('h4', null, 'Comfort reels — most rewatched'));
-      pc2.appendChild(ranked(v.rewatchTop, (d) => `(${d.year})`));
+      const list = ranked(v.rewatchTop, (d) => `(${d.year})`);
+      // swap plain names for Letterboxd links where we know the film
+      [...list.querySelectorAll('.name')].forEach((el, i) => {
+        const d = v.rewatchTop[i];
+        if (d.tid) el.replaceWith(filmLink(d.tid, d.name, 'name'));
+      });
+      pc2.appendChild(list);
       g3.appendChild(pc2);
     }
     taste.appendChild(g3);
@@ -302,7 +319,8 @@ function renderDashboard(v) {
       rx.appendChild(h('h4', 'shelf-label', label));
       const shelf = h('div', 'shelf');
       cards.forEach((c, ci) => {
-        const card = h('div', 'pcard');
+        const card = c.tmdbId ? h('a', 'pcard') : h('div', 'pcard');
+        if (c.tmdbId) { card.href = lbUrl(c.tmdbId); card.target = '_blank'; card.rel = 'noopener'; }
         if (c.poster) {
           const img = document.createElement('img');
           if (ci >= 4) img.loading = 'lazy'; // first few paint immediately
@@ -338,7 +356,9 @@ function renderDashboard(v) {
   for (const r of v.recent) {
     const li = h('li');
     li.appendChild(h('span', 'd', r.date));
-    const t = h('span', 't', r.title + ' ');
+    const t = h('span', 't');
+    t.appendChild(filmLink(r.tid, r.title));
+    t.appendChild(document.createTextNode(' '));
     t.appendChild(h('span', 'y', `(${r.year})`));
     li.appendChild(t);
     if (r.rewatch) li.appendChild(h('span', 'rw', 'RW'));
@@ -352,7 +372,9 @@ function renderDashboard(v) {
     pf.appendChild(h('h4', null, 'The five-star shelf'));
     const chips = h('div', 'chips');
     for (const f of v.fiveStar) {
-      const c = h('span', 'chip', f.title + ' ');
+      const c = f.tid ? h('a', 'chip') : h('span', 'chip');
+      if (f.tid) { c.href = lbUrl(f.tid); c.target = '_blank'; c.rel = 'noopener'; }
+      c.appendChild(document.createTextNode(f.title + ' '));
       c.appendChild(h('span', 'y', f.year));
       chips.appendChild(c);
     }
@@ -397,7 +419,9 @@ function renderDashboard(v) {
     const rows = v.ledger.map((r) => {
       const li = h('li');
       li.appendChild(h('span', 'd', r.d));
-      const t = h('span', 't', r.t + ' ');
+      const t = h('span', 't');
+      t.appendChild(filmLink(r.id, r.t));
+      t.appendChild(document.createTextNode(' '));
       t.appendChild(h('span', 'y', `(${r.y})`));
       li.appendChild(t);
       if (r.w) li.appendChild(h('span', 'rw', 'RW'));

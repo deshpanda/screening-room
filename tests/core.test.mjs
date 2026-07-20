@@ -76,7 +76,7 @@ function fixture() {
     { name: 'Stalker', year: '1979', rating: 4.5 },
   ];
   const films = {
-    [filmKey('Heat', '1995')]: { genres: ['Crime', 'Drama'], runtime: 170, director: 'Michael Mann', cast: ['Al Pacino', 'Robert De Niro'], countries: ['United States'], language: 'en', tmdbRating: 8.0, popularity: 60 },
+    [filmKey('Heat', '1995')]: { tmdbId: 949, genres: ['Crime', 'Drama'], runtime: 170, director: 'Michael Mann', cast: ['Al Pacino', 'Robert De Niro'], countries: ['United States'], language: 'en', tmdbRating: 8.0, popularity: 60 },
     [filmKey('Drive', '2011')]: { genres: ['Crime', 'Drama'], runtime: 100, director: 'Nicolas Winding Refn', cast: ['Ryan Gosling'], countries: ['United States'], language: 'en', tmdbRating: 7.6, popularity: 45 },
     [filmKey('Ratatouille', '2007')]: { genres: ['Animation', 'Comedy'], runtime: 111, director: 'Brad Bird', cast: [], countries: ['United States'], language: 'en', tmdbRating: 7.8, popularity: 80 },
     [filmKey('Stalker', '1979')]: { genres: ['Drama', 'Science Fiction'], runtime: 162, director: 'Andrei Tarkovsky', cast: [], countries: ['Soviet Union'], language: 'ru', tmdbRating: 8.1, popularity: 6 },
@@ -148,7 +148,7 @@ test('insights: heatmapYears covers each calendar year, clipped to the last watc
 
 test('insights: comfort reels count multiple watches of the same film', () => {
   const r = computeInsights(fixture());
-  assert.deepEqual(r.rewatchTop, [{ name: 'Heat', year: '1995', count: 2 }]);
+  assert.deepEqual(r.rewatchTop, [{ name: 'Heat', year: '1995', count: 2, tid: 949 }]);
 });
 
 test('insights: runtime buckets over unique enriched films', () => {
@@ -177,6 +177,15 @@ test('insights: ledger is the full diary, newest first', () => {
   assert.equal(r.ledger[0].t, 'Stalker');
   assert.equal(r.ledger[4].t, 'Heat');
   assert.equal(r.ledger[2].w, true); // the Heat rewatch on Jan 3
+});
+
+test('insights: TMDB ids thread through for Letterboxd links', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.ledger[4].id, 949);       // Heat
+  assert.equal(r.ledger[0].id, null);      // Stalker fixture has no tmdbId
+  assert.equal(r.rewatchTop[0].tid, 949);
+  const heatRecent = r.recent.find((x) => x.title === 'Heat');
+  assert.equal(heatRecent.tid, 949);
 });
 
 test('insights: median release year and film age', () => {
