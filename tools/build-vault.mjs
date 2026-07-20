@@ -68,8 +68,10 @@ function loadExport(dir) {
   const ratings = readCsv(dir, 'ratings.csv').map((r) => ({
     name: col(r, 'Name'), year: col(r, 'Year'), rating: parseFloat(col(r, 'Rating')) || null,
   })).filter((r) => r.rating);
-  const watchlistCount = readCsv(dir, 'watchlist.csv').length;
-  return { diary, watched, ratings, watchlistCount };
+  const watchlist = readCsv(dir, 'watchlist.csv')
+    .map((r) => ({ name: col(r, 'Name'), year: col(r, 'Year') }))
+    .filter((w) => w.name);
+  return { diary, watched, ratings, watchlist, watchlistCount: watchlist.length };
 }
 
 // ---- TMDB enrichment (cached, throttled) -----------------------------------
@@ -111,6 +113,7 @@ async function enrich(uniqueFilms, key) {
       if (detail) {
         const director = detail.credits?.crew?.find((c) => c.job === 'Director')?.name || null;
         cache[k] = {
+          tmdbId: hit.id,
           genres: (detail.genres || []).map((g) => g.name),
           runtime: detail.runtime || 0,
           director,
@@ -205,6 +208,14 @@ data.generatedAt = new Date().toISOString().slice(0, 10);
 const insights = computeInsights(data);
 console.log(`Insights computed: ${insights.totals.uniqueFilms} films, ${insights.totals.hours} hours, ${insights.genres.length} genres.`);
 
+if (!flag('--demo') && !flag('--no-recs') && process.env.TMDB_KEY) {
+  console.log('Building recommendation shelves…');
+  const { buildRecs } = await import('./recs-build.mjs');
+  insights.recs = await buildRecs(data, process.env.TMDB_KEY);
+} else if (!flag('--demo')) {
+  console.log('Skipping recommendations (no TMDB_KEY or --no-recs).');
+}
+
 const [p1, p2] = await askPassphrases();
 if (!p1 || p1 !== p2) {
   console.error('Passphrases empty or mismatched — nothing written.');
@@ -216,8 +227,8 @@ writeFileSync(OUT_PATH, await encryptVault(insights, p1));
 // updater merge new watches without ever needing the export again.
 writeFileSync(SRC_PATH, await encryptVault({
   diary: data.diary, watched: data.watched, ratings: data.ratings,
-  watchlistCount: data.watchlistCount, films: data.films,
-  displayName: data.displayName,
+  watchlist: data.watchlist || [], watchlistCount: data.watchlistCount,
+  films: data.films, displayName: data.displayName,
 }, p1));
 console.log(`\nWrote ${OUT_PATH} (${Math.round(readFileSync(OUT_PATH).length / 1024)} KB) and ${SRC_PATH} (${Math.round(readFileSync(SRC_PATH).length / 1024)} KB), both AES-256-GCM.`);
 console.log('Commit data/ and push. The passphrase itself is stored nowhere.');

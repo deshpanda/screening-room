@@ -78,6 +78,7 @@ async function enrichById(tmdbId, key) {
   if (!res.ok) return null;
   const d = await res.json();
   return {
+    tmdbId: Number(tmdbId),
     genres: (d.genres || []).map((g) => g.name),
     runtime: d.runtime || 0,
     director: d.credits?.crew?.find((c) => c.job === 'Director')?.name || null,
@@ -132,9 +133,16 @@ src.diary.sort((a, b) => (a.watchedDate < b.watchedDate ? -1 : 1));
 src.generatedAt = new Date().toISOString().slice(0, 10);
 const insights = computeInsights(src);
 
+if (TMDB_KEY) {
+  console.log('Rebuilding recommendation shelves…');
+  const { buildRecs } = await import('./recs-build.mjs');
+  insights.recs = await buildRecs(src, TMDB_KEY);
+}
+
 writeFileSync(OUT_PATH, await encryptVault(insights, VAULT_PASS));
 writeFileSync(SRC_PATH, await encryptVault({
   diary: src.diary, watched: src.watched, ratings: src.ratings,
-  watchlistCount: src.watchlistCount, films: src.films, displayName: src.displayName,
+  watchlist: src.watchlist || [], watchlistCount: src.watchlistCount,
+  films: src.films, displayName: src.displayName,
 }, VAULT_PASS));
 console.log(`CHANGED — merged ${added} new diary entr${added === 1 ? 'y' : 'ies'} (${enriched} newly enriched). Now ${insights.totals.diaryEntries} entries, ${insights.totals.uniqueFilms} films.`);

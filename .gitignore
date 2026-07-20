@@ -3,6 +3,7 @@ export/
 export*/
 *.zip
 tools/.tmdb-cache.json
+tools/.imdb-ratings.tsv
 config.local*
 .env*
 

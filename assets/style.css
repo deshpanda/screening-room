@@ -246,6 +246,36 @@ section.block { margin: 42px 0; }
   letter-spacing: 0.08em; margin: 64px 0 0;
 }
 
+/* recommendation shelves */
+.shelf-label {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--muted); margin: 20px 0 10px; font-weight: 700;
+}
+.shelf {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 148px; gap: 14px;
+  overflow-x: auto; padding: 2px 2px 12px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+.shelf::-webkit-scrollbar { height: 6px; }
+.shelf::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.pcard { scroll-snap-align: start; }
+.pcard img, .noposter {
+  width: 100%; aspect-ratio: 2 / 3; object-fit: cover; display: block;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2);
+}
+.pcard img { transition: transform 0.25s ease, border-color 0.25s ease; }
+.pcard:hover img { transform: translateY(-3px); border-color: var(--amber-dim); }
+.noposter {
+  display: grid; place-items: center; padding: 10px; text-align: center;
+  font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+}
+.pcard .t { font-size: 0.82rem; font-weight: 600; line-height: 1.3; margin: 8px 0 0; }
+.pcard .t .y { color: var(--faint); font-weight: 400; font-size: 0.72rem; }
+.pcard .m { font-family: var(--mono); font-size: 0.64rem; color: var(--muted); margin: 3px 0 0; letter-spacing: 0.03em; }
+.pcard .m.g { color: var(--faint); }
+.pcard .why { font-size: 0.68rem; font-style: italic; color: var(--faint); margin: 4px 0 0; line-height: 1.35; }
+
 /* tooltip */
 #tip {
   position: fixed; z-index: 10; pointer-events: none; display: none;

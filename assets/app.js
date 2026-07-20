@@ -286,6 +286,49 @@ function renderDashboard(v) {
   verdicts.appendChild(vc);
   wrap.appendChild(verdicts);
 
+  // the next pictures — recommendation shelves
+  if (v.recs) {
+    const rx = block('The next pictures', 'TMDB’s engine, weighted by your ratings');
+    const SHELVES = [
+      ['because', 'Because you just watched'],
+      ['forYou', 'From everything you’ve loved'],
+      ['meet', 'Meet a master'],
+      ['moreFrom', 'More from directors you love'],
+      ['watchlistFirst', 'Off your watchlist first'],
+    ];
+    for (const [key, label] of SHELVES) {
+      const cards = v.recs[key];
+      if (!cards || !cards.length) continue;
+      rx.appendChild(h('h4', 'shelf-label', label));
+      const shelf = h('div', 'shelf');
+      cards.forEach((c, ci) => {
+        const card = h('div', 'pcard');
+        if (c.poster) {
+          const img = document.createElement('img');
+          if (ci >= 4) img.loading = 'lazy'; // first few paint immediately
+          img.alt = `${c.title} poster`;
+          img.src = `https://image.tmdb.org/t/p/w342${c.poster}`;
+          card.appendChild(img);
+        } else {
+          card.appendChild(h('div', 'noposter', c.title));
+        }
+        const t = h('p', 't', c.title + ' ');
+        t.appendChild(h('span', 'y', `(${c.year})`));
+        card.appendChild(t);
+        const bits = [];
+        if (c.tmdb?.rating) bits.push(`${c.tmdb.rating} tmdb`);
+        if (c.imdb?.rating) bits.push(`${c.imdb.rating} imdb`);
+        if (c.runtime) bits.push(`${c.runtime}m`);
+        if (bits.length) card.appendChild(h('p', 'm', bits.join(' · ')));
+        if (c.genres?.length) card.appendChild(h('p', 'm g', c.genres.join(' / ')));
+        if (c.why) card.appendChild(h('p', 'why', c.why));
+        shelf.appendChild(card);
+      });
+      rx.appendChild(shelf);
+    }
+    wrap.appendChild(rx);
+  }
+
   // recent + five-star wall
   const last = block('Last reels', 'recent diary');
   const g6 = h('div', 'grid2');

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parseCsv, parseCsvObjects } from '../lib/csv.js';
 import { encryptVault, decryptVault, envelopeSalt, deriveKeyBytes, decryptWithKeyBytes } from '../lib/vaultcrypto.js';
 import { computeInsights, filmKey } from '../lib/insights.js';
+import { seedWeight, aggregate, genreAffinity, normTitle } from '../lib/recs.js';
 
 // ---------- CSV ----------
 
@@ -183,6 +184,55 @@ test('insights: median release year and film age', () => {
   const r = computeInsights(data);
   assert.equal(r.medianReleaseYear, 1995); // 1960,1979,[1995],2007,2011
   assert.equal(r.avgFilmAge, Math.round(2026 - (1960 + 1979 + 1995 + 2007 + 2011) / 5));
+});
+
+// ---------- recommendation core ----------
+
+const recItem = (id, title, va = 7.5, vc = 5000) =>
+  ({ id, title, year: '2010', vote_average: va, vote_count: vc, poster_path: null });
+
+test('recs: seed weights scale with rating; below 3.5 contributes nothing', () => {
+  assert.equal(seedWeight(5), 2);
+  assert.equal(seedWeight(4), 1);
+  assert.equal(seedWeight(3.5), 0.5);
+  assert.equal(seedWeight(3), 0);
+});
+
+test('recs: watched films are excluded by id and by normalized title+year', () => {
+  const lists = [{ seed: { title: 'Heat', weight: 2 }, items: [recItem(1, 'Watched: By Id'), recItem(2, 'The Insider')] }];
+  const out = aggregate(lists, { exclude: new Set([1, `${normTitle('The Insider')} 2010`]) });
+  assert.equal(out.length, 0);
+});
+
+test('recs: a film recommended by two seeds outranks a single-seed film', () => {
+  const lists = [
+    { seed: { title: 'A', weight: 1 }, items: [recItem(10, 'Solo Pick', 8.5, 9000), recItem(20, 'Consensus', 7.5, 5000)] },
+    { seed: { title: 'B', weight: 1 }, items: [recItem(20, 'Consensus', 7.5, 5000)] },
+  ];
+  const out = aggregate(lists);
+  assert.equal(out[0].title, 'Consensus');
+  assert.deepEqual(out[0].seeds, ['A', 'B']);
+});
+
+test('recs: junk floor drops tiny-vote films unless multiple seeds agree', () => {
+  const lists = [
+    { seed: { title: 'A', weight: 2 }, items: [recItem(1, 'Obscure', 8, 50)] },
+    { seed: { title: 'B', weight: 2 }, items: [recItem(2, 'Obscure But Agreed', 8, 50)] },
+    { seed: { title: 'C', weight: 2 }, items: [recItem(2, 'Obscure But Agreed', 8, 50)] },
+  ];
+  const out = aggregate(lists, { minVotes: 200 });
+  assert.deepEqual(out.map((c) => c.title), ['Obscure But Agreed']);
+});
+
+test('recs: same-title exclusion blocks other adaptations of watched films', () => {
+  const lists = [{ seed: { title: 'X', weight: 2 }, items: [recItem(9, 'The Great Gatsby', 8, 9000)] }];
+  const out = aggregate(lists, { excludeTitles: new Set([normTitle('The Great Gatsby')]) });
+  assert.equal(out.length, 0);
+});
+
+test('recs: genre affinity rewards overlap and never zeroes out', () => {
+  assert.ok(genreAffinity(['Crime', 'Drama'], ['Crime', 'Drama']) > genreAffinity(['Crime', 'Drama'], ['Comedy']));
+  assert.ok(genreAffinity(['Crime'], ['Comedy']) >= 0.4);
 });
 
 test('insights: empty input does not crash', () => {
