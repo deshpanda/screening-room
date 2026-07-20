@@ -195,6 +195,27 @@ test('insights: median release year and film age', () => {
   assert.equal(r.avgFilmAge, Math.round(2026 - (1960 + 1979 + 1995 + 2007 + 2011) / 5));
 });
 
+test('insights: year in review computes per-year peaks and tops', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.yearReviews.length, 1);
+  const y = r.yearReviews[0];
+  assert.equal(y.year, '2026');
+  assert.equal(y.films, 5);
+  assert.equal(y.rewatches, 1);
+  assert.equal(y.topGenre, 'Drama');
+  assert.equal(y.bestFilm.t, 'Heat');
+  assert.equal(y.harshest.t, 'Ratatouille');
+});
+
+test('insights: calibration pairs your rating with the crowd per film', () => {
+  const r = computeInsights(fixture());
+  assert.equal(r.calibration.length, 4); // 4 rated + enriched films
+  const heat = r.calibration.find((p) => p.t === 'Heat');
+  assert.equal(heat.mine, 5);
+  assert.equal(heat.crowd, 4); // tmdb 8.0 / 2
+  assert.equal(heat.tid, 949);
+});
+
 // ---------- recommendation core ----------
 
 const recItem = (id, title, va = 7.5, vc = 5000) =>

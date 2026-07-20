@@ -79,6 +79,9 @@ async function enrichById(tmdbId, key) {
   const d = await res.json();
   return {
     tmdbId: Number(tmdbId),
+    collection: d.belongs_to_collection
+      ? { id: d.belongs_to_collection.id, name: d.belongs_to_collection.name }
+      : null,
     genres: (d.genres || []).map((g) => g.name),
     runtime: d.runtime || 0,
     director: d.credits?.crew?.find((c) => c.job === 'Director')?.name || null,

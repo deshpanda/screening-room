@@ -60,12 +60,18 @@ async function imdbRatings(neededIds) {
 }
 
 // ---- card assembly ----------------------------------------------------------
+// Providers come from TMDB's JustWatch feed for region IN — the FREE and
+// ad-supported services surface first, subscriptions second. Legal only.
 async function toCards(items, key, whyOf = () => null) {
   const cards = [];
   for (const it of items) {
-    const d = await tmdb(`/movie/${it.id}`, { append_to_response: 'external_ids' }, key);
+    const d = await tmdb(`/movie/${it.id}`, { append_to_response: 'external_ids,watch/providers' }, key);
     await sleep(90);
     if (!d) continue;
+    const IN = d['watch/providers']?.results?.IN || {};
+    const names = (arr) => (arr || []).map((p) => p.provider_name);
+    const free = [...new Set([...names(IN.free), ...names(IN.ads)])].slice(0, 3);
+    const sub = names(IN.flatrate).filter((n) => !free.includes(n)).slice(0, 2);
     cards.push({
       tmdbId: it.id,
       title: d.title,
@@ -76,6 +82,7 @@ async function toCards(items, key, whyOf = () => null) {
       tmdb: { rating: Math.round((d.vote_average || 0) * 10) / 10, votes: d.vote_count || 0 },
       imdbId: d.external_ids?.imdb_id || null,
       imdb: null, // joined later from the dataset
+      watch: free.length || sub.length ? { free, sub } : null,
       why: whyOf(it),
     });
   }
@@ -213,6 +220,62 @@ export async function buildRecs(src, key) {
     if (r && (r.film.vote_average || 0) >= 7.2) moreFrom.push({ name, ...r });
   }
 
+  // ---- follow the faces: most-seen actors → their best unwatched film ----------
+  const actorCount = new Map();
+  for (const f of Object.values(films)) {
+    for (const a of (f.cast || []).slice(0, 4)) actorCount.set(a, (actorCount.get(a) || 0) + 1);
+  }
+  const topActors = [...actorCount.entries()]
+    .filter(([, c]) => c >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([a]) => a);
+  const faces = [];
+  for (const name of topActors) {
+    const p = await tmdb('/search/person', { query: name }, key);
+    await sleep(90);
+    const person = p?.results?.[0];
+    if (!person) continue;
+    const credits = await tmdb(`/person/${person.id}/movie_credits`, {}, key);
+    await sleep(90);
+    const acted = (credits?.cast || [])
+      .filter((c) => (c.vote_count || 0) >= 500 && (c.order ?? 99) <= 6) // real roles, not cameos
+      .filter((c) => !exclude.has(c.id) && !exclude.has(`${normTitle(c.title)} ${yearOf(c.release_date)}`))
+      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+    if (acted.length && (acted[0].vote_average || 0) >= 7.0) {
+      faces.push({ ...acted[0], actor: name });
+    }
+  }
+
+  // ---- unfinished business: franchises started but not completed -----------------
+  const collections = new Map();
+  for (const f of Object.values(films)) {
+    if (f.collection?.id) collections.set(f.collection.id, f.collection.name);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const franchises = [];
+  for (const [cid, cname] of [...collections.entries()].slice(0, 30)) {
+    const col = await tmdb(`/collection/${cid}`, {}, key);
+    await sleep(90);
+    if (!col?.parts) continue;
+    const released = col.parts.filter((p) => p.release_date && p.release_date <= today && (p.vote_count || 0) > 20);
+    const seen = released.filter((p) => exclude.has(p.id) || exclude.has(`${normTitle(p.title)} ${yearOf(p.release_date)}`));
+    const missing = released
+      .filter((p) => !seen.includes(p))
+      .sort((a, b) => (a.release_date < b.release_date ? -1 : 1));
+    if (released.length >= 2 && seen.length >= 1 && missing.length >= 1) {
+      franchises.push({
+        name: cname.replace(/ Collection$/i, ''),
+        seen: seen.length,
+        total: released.length,
+        missing: missing.slice(0, 2).map((p) => ({
+          title: p.title, year: yearOf(p.release_date), tmdbId: p.id,
+        })),
+      });
+    }
+  }
+  franchises.sort((a, b) => (b.seen / b.total) - (a.seen / a.total) || b.seen - a.seen);
+
   // ---- watchlist, ranked ------------------------------------------------------
   const watchlistCards = [];
   for (const w of watchlist.slice(0, 12)) {
@@ -232,6 +295,7 @@ export async function buildRecs(src, key) {
     forYou: await toCards(forYouTop, key, whyFromSeeds),
     meet: await toCards(meet.map((m) => ({ ...m.film, director: m.name })), key, (it) => `meet ${it.director}`),
     moreFrom: await toCards(moreFrom.map((m) => ({ ...m.film, director: m.name })), key, (it) => `more ${it.director}`),
+    faces: await toCards(faces.map((f) => ({ ...f, id: f.id })), key, (it) => `more ${it.actor}`),
     watchlistFirst: await toCards(watchlistCards.slice(0, 10), key, () => 'already on your list'),
   };
 
@@ -250,7 +314,9 @@ export async function buildRecs(src, key) {
   shelves.because = shelves.because.filter(floor).slice(0, 12);
   shelves.forYou = shelves.forYou.filter(floor).slice(0, 12);
 
+  shelves.franchises = franchises.slice(0, 8);
+
   const total = Object.values(shelves).reduce((s, x) => s + x.length, 0);
-  console.log(`  recs: ${total} cards across ${Object.keys(shelves).length} shelves (IMDb joined for ${ratingsMap.size}).`);
+  console.log(`  recs: ${total} cards+rows across ${Object.keys(shelves).length} groups (IMDb joined for ${ratingsMap.size}, ${franchises.length} unfinished franchises).`);
   return shelves;
 }

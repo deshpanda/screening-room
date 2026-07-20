@@ -114,6 +114,9 @@ async function enrich(uniqueFilms, key) {
         const director = detail.credits?.crew?.find((c) => c.job === 'Director')?.name || null;
         cache[k] = {
           tmdbId: hit.id,
+          collection: detail.belongs_to_collection
+            ? { id: detail.belongs_to_collection.id, name: detail.belongs_to_collection.name }
+            : null,
           genres: (detail.genres || []).map((g) => g.name),
           runtime: detail.runtime || 0,
           director,

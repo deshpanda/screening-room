@@ -4,7 +4,7 @@
 // doesn't re-prompt; Lock clears it.
 
 import { decryptWithKeyBytes, deriveKeyBytes, envelopeSalt, b64 } from '../lib/vaultcrypto.js';
-import { h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block, resetBlockCounter } from '../lib/render.js';
+import { h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block, resetBlockCounter, scatterChart } from '../lib/render.js';
 
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const YEAR_WEEKS = 54; // one shared grid for every year strip
@@ -301,7 +301,81 @@ function renderDashboard(v) {
   const ms = v.milestones[v.milestones.length - 1];
   if (ms && ms.n >= 50) vc.appendChild(callout(`Watch #${ms.n}`, ms.title, ms.date));
   verdicts.appendChild(vc);
+
+  // you vs the crowd — scatter of your rating against TMDB's
+  if (v.calibration && v.calibration.length >= 10) {
+    const ps = h('div', 'panel');
+    ps.style.marginTop = '14px';
+    ps.appendChild(h('h4', null, 'You vs the crowd — every rated film'));
+    ps.appendChild(scatterChart(v.calibration));
+    ps.appendChild(h('p', 'hint-line', 'above the line: you liked it more than the crowd · below: less'));
+    verdicts.appendChild(ps);
+  }
   wrap.appendChild(verdicts);
+
+  // year in review
+  if (v.yearReviews && v.yearReviews.length) {
+    const yrb = block('The year in review', 'pick a year');
+    const chipsRow = h('div', 'yr-chips');
+    const slot = h('div');
+    const show = (r) => {
+      slot.innerHTML = '';
+      const card = h('div', 'panel yr-card');
+      const bignums = h('div', 'yr-nums');
+      const num = (v2, k) => {
+        const d = h('div', 'yr-num');
+        d.appendChild(h('p', 'v', String(v2)));
+        d.appendChild(h('p', 'k', k));
+        return d;
+      };
+      bignums.appendChild(num(r.films, 'films'));
+      bignums.appendChild(num(r.hours, 'hours'));
+      bignums.appendChild(num(r.avgRating ? r.avgRating + '★' : '—', 'avg rating'));
+      bignums.appendChild(num(r.rewatches, 'rewatches'));
+      card.appendChild(bignums);
+      const rows = h('ul', 'diary');
+      const row = (k, node) => {
+        const li = h('li');
+        li.appendChild(h('span', 'd', k));
+        const t = h('span', 't');
+        t.appendChild(node);
+        li.appendChild(t);
+        rows.appendChild(li);
+      };
+      if (r.topGenre) row('top genre', document.createTextNode(r.topGenre));
+      if (r.topDirector) row('top director', document.createTextNode(r.topDirector));
+      if (r.bestFilm) {
+        const n = filmLink(r.bestFilm.tid, `${r.bestFilm.t} (${r.bestFilm.y})`);
+        const wrap2 = h('span');
+        wrap2.appendChild(n);
+        wrap2.appendChild(h('span', 'stars', ' ' + stars(r.bestFilm.r)));
+        row('the peak', wrap2);
+      }
+      if (r.harshest && r.harshest.t !== r.bestFilm?.t) {
+        const n = filmLink(r.harshest.tid, `${r.harshest.t} (${r.harshest.y})`);
+        const wrap3 = h('span');
+        wrap3.appendChild(n);
+        wrap3.appendChild(h('span', 'stars', ' ' + stars(r.harshest.r)));
+        row('the walkout', wrap3);
+      }
+      card.appendChild(rows);
+      slot.appendChild(card);
+    };
+    v.yearReviews.forEach((r, i) => {
+      const c = h('button', 'chip' + (i === 0 ? ' chip-on' : ''), r.year);
+      c.type = 'button';
+      c.addEventListener('click', () => {
+        chipsRow.querySelectorAll('.chip').forEach((x) => x.classList.remove('chip-on'));
+        c.classList.add('chip-on');
+        show(r);
+      });
+      chipsRow.appendChild(c);
+    });
+    yrb.appendChild(chipsRow);
+    yrb.appendChild(slot);
+    show(v.yearReviews[0]);
+    wrap.appendChild(yrb);
+  }
 
   // the next pictures — recommendation shelves
   if (v.recs) {
@@ -311,39 +385,116 @@ function renderDashboard(v) {
       ['forYou', 'From everything you’ve loved'],
       ['meet', 'Meet a master'],
       ['moreFrom', 'More from directors you love'],
+      ['faces', 'Follow the faces'],
       ['watchlistFirst', 'Off your watchlist first'],
     ];
+
+    function buildCard(c, eager = false, big = false) {
+      const card = c.tmdbId ? h('a', 'pcard' + (big ? ' pcard-big' : '')) : h('div', 'pcard');
+      if (c.tmdbId) { card.href = lbUrl(c.tmdbId); card.target = '_blank'; card.rel = 'noopener'; }
+      if (c.poster) {
+        const img = document.createElement('img');
+        if (!eager) img.loading = 'lazy';
+        img.alt = `${c.title} poster`;
+        img.src = `https://image.tmdb.org/t/p/w342${c.poster}`;
+        card.appendChild(img);
+      } else {
+        card.appendChild(h('div', 'noposter', c.title));
+      }
+      const t = h('p', 't', c.title + ' ');
+      t.appendChild(h('span', 'y', `(${c.year})`));
+      card.appendChild(t);
+      const bits = [];
+      if (c.tmdb?.rating) bits.push(`${c.tmdb.rating} tmdb`);
+      if (c.imdb?.rating) bits.push(`${c.imdb.rating} imdb`);
+      if (c.runtime) bits.push(`${c.runtime}m`);
+      if (bits.length) card.appendChild(h('p', 'm', bits.join(' · ')));
+      if (c.genres?.length) card.appendChild(h('p', 'm g', c.genres.join(' / ')));
+      if (c.watch?.free?.length) card.appendChild(h('p', 'watch', `free: ${c.watch.free.join(' · ')}`));
+      else if (c.watch?.sub?.length) card.appendChild(h('p', 'watch sub', `on ${c.watch.sub.join(' · ')}`));
+      if (c.why) card.appendChild(h('p', 'why', c.why));
+      return card;
+    }
+
+    // tonight's pick — one film, no scrolling, no debate
+    const allCards = [];
+    for (const [key] of SHELVES) {
+      for (const c of v.recs[key] || []) {
+        if (!allCards.some((x) => x.tmdbId === c.tmdbId)) allCards.push({ ...c, shelfKey: key });
+      }
+    }
+    if (allCards.length) {
+      const bar = h('div', 'tonight');
+      const sel = h('select');
+      for (const [val, label] of [['any', 'any length'], ['100', 'under 100m'], ['130', 'under 130m']]) {
+        const o = h('option', null, label);
+        o.value = val;
+        sel.appendChild(o);
+      }
+      const btn = h('button', 'btn', 'Roll the projector');
+      btn.type = 'button';
+      const slot = h('div', 'tonight-slot');
+      btn.addEventListener('click', () => {
+        const cap = sel.value === 'any' ? Infinity : +sel.value;
+        const pool = allCards.filter((c) => !c.runtime || c.runtime <= cap);
+        slot.innerHTML = '';
+        if (!pool.length) { slot.appendChild(h('p', 'why', 'nothing that short on the shelves — roll again longer')); return; }
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        slot.appendChild(buildCard(pick, true, true));
+      });
+      bar.appendChild(h('span', 'tonight-label', 'What do I watch tonight?'));
+      bar.appendChild(sel);
+      bar.appendChild(btn);
+      rx.appendChild(bar);
+      rx.appendChild(slot);
+    }
+
     for (const [key, label] of SHELVES) {
       const cards = v.recs[key];
       if (!cards || !cards.length) continue;
-      rx.appendChild(h('h4', 'shelf-label', label));
-      const shelf = h('div', 'shelf');
-      cards.forEach((c, ci) => {
-        const card = c.tmdbId ? h('a', 'pcard') : h('div', 'pcard');
-        if (c.tmdbId) { card.href = lbUrl(c.tmdbId); card.target = '_blank'; card.rel = 'noopener'; }
-        if (c.poster) {
-          const img = document.createElement('img');
-          if (ci >= 4) img.loading = 'lazy'; // first few paint immediately
-          img.alt = `${c.title} poster`;
-          img.src = `https://image.tmdb.org/t/p/w342${c.poster}`;
-          card.appendChild(img);
-        } else {
-          card.appendChild(h('div', 'noposter', c.title));
-        }
-        const t = h('p', 't', c.title + ' ');
-        t.appendChild(h('span', 'y', `(${c.year})`));
-        card.appendChild(t);
-        const bits = [];
-        if (c.tmdb?.rating) bits.push(`${c.tmdb.rating} tmdb`);
-        if (c.imdb?.rating) bits.push(`${c.imdb.rating} imdb`);
-        if (c.runtime) bits.push(`${c.runtime}m`);
-        if (bits.length) card.appendChild(h('p', 'm', bits.join(' · ')));
-        if (c.genres?.length) card.appendChild(h('p', 'm g', c.genres.join(' / ')));
-        if (c.why) card.appendChild(h('p', 'why', c.why));
-        shelf.appendChild(card);
+      const head = h('div', 'shelf-head');
+      head.appendChild(h('h4', 'shelf-label', label));
+      const dl = h('button', 'csv-btn', '↓ csv for letterboxd');
+      dl.type = 'button';
+      dl.title = 'Download this shelf as a CSV you can import as a Letterboxd list';
+      dl.addEventListener('click', () => {
+        const rows = [['Title', 'Year', 'tmdbID'], ...cards.map((c) => [c.title, c.year, c.tmdbId])];
+        const csv = rows.map((r) => r.map((x) => `"${String(x ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = `${key}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
       });
+      head.appendChild(dl);
+      rx.appendChild(head);
+      const shelf = h('div', 'shelf');
+      cards.forEach((c, ci) => shelf.appendChild(buildCard(c, ci < 4)));
       rx.appendChild(shelf);
     }
+
+    // unfinished business — franchises started but not completed
+    if (v.recs.franchises?.length) {
+      rx.appendChild(h('h4', 'shelf-label', 'Unfinished business'));
+      const fr = h('div', 'panel');
+      const ol = h('ol', 'ranked');
+      for (const f of v.recs.franchises) {
+        const li = h('li');
+        li.appendChild(h('span', 'n', `${f.seen}/${f.total}`));
+        li.appendChild(h('span', 'name', f.name));
+        const miss = h('span', 'extra');
+        miss.appendChild(document.createTextNode('missing: '));
+        f.missing.forEach((m, i) => {
+          if (i) miss.appendChild(document.createTextNode(', '));
+          miss.appendChild(filmLink(m.tmdbId, `${m.title} (${m.year})`));
+        });
+        li.appendChild(miss);
+        ol.appendChild(li);
+      }
+      fr.appendChild(ol);
+      rx.appendChild(fr);
+    }
+
     wrap.appendChild(rx);
   }
 
