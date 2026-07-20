@@ -271,9 +271,9 @@ section.block { margin: 42px 0; }
 .pcard { scroll-snap-align: start; display: block; text-decoration: none; color: inherit; }
 a.pcard:hover .t { color: var(--amber); }
 
-/* film links — quiet until hovered */
-.film-link { color: inherit; text-decoration: none; border-bottom: 1px dotted transparent; }
-.film-link:hover { color: var(--amber); border-bottom-color: var(--amber-dim); text-decoration: none; }
+/* film links — discoverable dotted underline, amber on hover */
+.film-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--faint); }
+.film-link:hover { color: var(--amber); border-bottom-color: var(--amber); text-decoration: none; }
 a.chip { text-decoration: none; }
 a.chip:hover { border-color: var(--amber); color: var(--amber); }
 .pcard img, .noposter {
@@ -365,8 +365,14 @@ button.chip { font: inherit; font-size: 0.85rem; cursor: pointer; }
   padding: 4px 0; border-bottom: 1px dashed var(--line);
 }
 .canon-cell.on { color: var(--text); }
+.canon-cell .cn { color: inherit; text-decoration: none; border-bottom: 1px dotted transparent; }
+.canon-cell .cn:hover { color: var(--amber); border-bottom-color: var(--amber); }
 .canon-cell .cc { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); }
 .canon-cell.on .cc { color: var(--amber); font-weight: 700; }
+
+/* spotlight director name is a link too */
+a.spot-name { display: inline-block; color: var(--text); text-decoration: none; }
+a.spot-name:hover { color: var(--amber); }
 
 /* scatter + hints */
 .hint-line { font-family: var(--mono); font-size: 0.66rem; color: var(--faint); letter-spacing: 0.06em; margin: 8px 0 0; }

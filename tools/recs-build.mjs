@@ -292,7 +292,7 @@ export async function buildRecs(src, key) {
     const week = Math.floor(Date.now() / (7 * 86400000));
     for (let probe = 0; probe < 6 && !spotlight; probe++) {
       const name = CANON_DIRECTORS[(week + probe) % CANON_DIRECTORS.length];
-      const filmsTop = (await directorFilms(name, exclude, 3)).filter((f) => (f.vote_average || 0) >= 7.0);
+      const filmsTop = (await directorFilms(name, exclude, 5)).filter((f) => (f.vote_average || 0) >= 7.0);
       if (filmsTop.length >= 2) spotlight = { name, films: filmsTop };
     }
   }

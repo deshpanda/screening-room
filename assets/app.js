@@ -20,6 +20,9 @@ const YEAR_WEEKS = 54; // one shared grid for every year strip
 
 // Letterboxd's stable per-TMDB-id redirect — links a film without knowing its slug.
 const lbUrl = (tid) => `https://letterboxd.com/tmdb/${tid}`;
+// Director pages use diacritic-stripped kebab slugs (verified: kieślowski→kieslowski, ozu, wong-kar-wai).
+const dirUrl = (name) => 'https://letterboxd.com/director/'
+  + name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '/';
 function filmLink(tid, text, cls) {
   if (!tid) return h('span', cls, text);
   const a = h('a', cls ? cls + ' film-link' : 'film-link', text);
@@ -516,7 +519,11 @@ function secNext(v, wrap) {
   if (v.recs.spotlight?.films?.length) {
     const sp = h('div', 'spotlight');
     sp.appendChild(h('p', 'spot-k', 'Master spotlight · this print'));
-    sp.appendChild(h('h4', 'spot-name', v.recs.spotlight.name));
+    const nameLink = h('a', 'spot-name', v.recs.spotlight.name);
+    nameLink.href = dirUrl(v.recs.spotlight.name);
+    nameLink.target = '_blank';
+    nameLink.rel = 'noopener';
+    sp.appendChild(nameLink);
     const row = h('div', 'shelf');
     v.recs.spotlight.films.forEach((c) => row.appendChild(buildCard(c, true)));
     sp.appendChild(row);
@@ -703,7 +710,11 @@ function secNext(v, wrap) {
     const cb = h('div', 'panel canon-board');
     for (const c of v.recs.canon) {
       const cell = h('span', 'canon-cell' + (c.seen ? ' on' : ''));
-      cell.appendChild(h('span', 'cn', c.name));
+      const link = h('a', 'cn', c.name);
+      link.href = dirUrl(c.name);
+      link.target = '_blank';
+      link.rel = 'noopener';
+      cell.appendChild(link);
       cell.appendChild(h('span', 'cc', c.seen ? `×${c.seen}` : '—'));
       cb.appendChild(cell);
     }
