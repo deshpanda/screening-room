@@ -97,6 +97,15 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .masthead .title { font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; font-size: 1.05rem; }
 .masthead .title span { color: var(--amber); }
 .masthead .meta { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+.site-nav { display: flex; gap: 4px 18px; flex-wrap: wrap; }
+.site-nav a {
+  font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted); text-decoration: none;
+  border-bottom: 2px solid transparent; padding-bottom: 2px;
+}
+.site-nav a:hover { color: var(--text); }
+.site-nav a[aria-current="page"] { color: var(--amber); border-bottom-color: var(--amber); }
+.mast-right { display: flex; align-items: baseline; gap: 14px; }
 .masthead button {
   font: inherit; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em;
   text-transform: uppercase; cursor: pointer; color: var(--muted);
@@ -320,6 +329,8 @@ button.chip { font: inherit; font-size: 0.85rem; cursor: pointer; }
 
 /* scatter + hints */
 .hint-line { font-family: var(--mono); font-size: 0.66rem; color: var(--faint); letter-spacing: 0.06em; margin: 8px 0 0; }
+.scatter-caption { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; }
+.scatter-caption span { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.04em; }
 
 /* tooltip */
 #tip {

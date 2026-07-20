@@ -60,18 +60,12 @@ async function imdbRatings(neededIds) {
 }
 
 // ---- card assembly ----------------------------------------------------------
-// Providers come from TMDB's JustWatch feed for region IN — the FREE and
-// ad-supported services surface first, subscriptions second. Legal only.
 async function toCards(items, key, whyOf = () => null) {
   const cards = [];
   for (const it of items) {
-    const d = await tmdb(`/movie/${it.id}`, { append_to_response: 'external_ids,watch/providers' }, key);
+    const d = await tmdb(`/movie/${it.id}`, { append_to_response: 'external_ids' }, key);
     await sleep(90);
     if (!d) continue;
-    const IN = d['watch/providers']?.results?.IN || {};
-    const names = (arr) => (arr || []).map((p) => p.provider_name);
-    const free = [...new Set([...names(IN.free), ...names(IN.ads)])].slice(0, 3);
-    const sub = names(IN.flatrate).filter((n) => !free.includes(n)).slice(0, 2);
     cards.push({
       tmdbId: it.id,
       title: d.title,
@@ -82,7 +76,6 @@ async function toCards(items, key, whyOf = () => null) {
       tmdb: { rating: Math.round((d.vote_average || 0) * 10) / 10, votes: d.vote_count || 0 },
       imdbId: d.external_ids?.imdb_id || null,
       imdb: null, // joined later from the dataset
-      watch: free.length || sub.length ? { free, sub } : null,
       why: whyOf(it),
     });
   }
@@ -152,10 +145,10 @@ export async function buildRecs(src, key) {
   const recentLists = [];
   for (const s of recentSeeds) recentLists.push(await recsFor(s));
 
-  // over-fetch, then an IMDb floor after the join trims to the final dozen
-  const forYouTop = aggregate(allLists, { exclude: shelfExclude, excludeTitles, limit: 24 });
+  // over-fetch a shared pool: the floor + runtime shelves carve it up later
+  const forYouTop = aggregate(allLists, { exclude: shelfExclude, excludeTitles, limit: 40 });
   const becauseTop = aggregate(recentLists, { exclude: shelfExclude, excludeTitles, limit: 24 })
-    .filter((c) => !forYouTop.some((f) => f.id === c.id)); // don't repeat across shelves
+    .filter((c) => !forYouTop.slice(0, 14).some((f) => f.id === c.id)); // don't repeat across shelves
 
   // ---- the user's genre profile (for director affinity) ---------------------
   const genreCount = new Map();
@@ -185,16 +178,30 @@ export async function buildRecs(src, key) {
     };
   }
 
+  // The masters program — the owner's favourite shelf, expanded.
+  // 1. Masters never met: probe widely, keep the best-fitting eight.
   const unmet = CANON_DIRECTORS.filter((d) => !watchedDirectorsCount.has(d));
-  // sample broadly but bound the calls: probe up to 12 unmet masters
   const probes = [];
-  for (const name of unmet.slice(0, 12)) {
+  for (const name of unmet.slice(0, 18)) {
     const r = await directorBest(name, exclude);
     if (r) probes.push({ name, ...r });
   }
-  const meet = probes.sort((a, b) => b.affinity - a.affinity).slice(0, 5);
+  const meet = probes.sort((a, b) => b.affinity - a.affinity).slice(0, 8);
 
-  // directors the owner already loves (2+ films, avg >= 3.8) — next film from each
+  // 2. Masters in progress: canon directors already started — their next film.
+  const startedMasters = CANON_DIRECTORS
+    .filter((d) => watchedDirectorsCount.has(d))
+    .sort((a, b) => watchedDirectorsCount.get(b) - watchedDirectorsCount.get(a))
+    .slice(0, 8);
+  const mastersProgress = [];
+  for (const name of startedMasters) {
+    const r = await directorBest(name, exclude);
+    if (r && (r.film.vote_average || 0) >= 7.0) {
+      mastersProgress.push({ name, seen: watchedDirectorsCount.get(name), ...r });
+    }
+  }
+
+  // 3. Non-canon directors the owner loves (2+ films, avg >= 3.8) — next film.
   const dirRatings = new Map();
   for (const [k, f] of Object.entries(films)) {
     if (!f.director) continue;
@@ -204,14 +211,10 @@ export async function buildRecs(src, key) {
     dirRatings.get(f.director).push(r);
   }
   const loved = [...dirRatings.entries()]
-    .filter(([d, rs]) => rs.length >= 2 && rs.reduce((s, x) => s + x, 0) / rs.length >= 3.8)
-    .sort((a, b) => {
-      // canon first, then by how much of them the owner has watched
-      const ca = CANON_DIRECTORS.includes(a[0]) ? 1 : 0;
-      const cb = CANON_DIRECTORS.includes(b[0]) ? 1 : 0;
-      return cb - ca || b[1].length - a[1].length;
-    })
-    .slice(0, 6)
+    .filter(([d, rs]) => !CANON_DIRECTORS.includes(d)
+      && rs.length >= 2 && rs.reduce((s, x) => s + x, 0) / rs.length >= 3.8)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5)
     .map(([d]) => d);
   const moreFrom = [];
   for (const name of loved) {
@@ -290,20 +293,25 @@ export async function buildRecs(src, key) {
   // ---- assemble cards + IMDb join ---------------------------------------------
   console.log('  recs: assembling cards…');
   const whyFromSeeds = (it) => (it.seeds?.length ? `because you loved ${it.seeds.slice(0, 2).join(' & ')}` : null);
+  const pool = await toCards(forYouTop, key, whyFromSeeds);
   const shelves = {
     because: await toCards(becauseTop.slice(0, 12), key, (it) => (it.seeds?.length ? `↳ ${it.seeds[0]}` : null)),
-    forYou: await toCards(forYouTop, key, whyFromSeeds),
     meet: await toCards(meet.map((m) => ({ ...m.film, director: m.name })), key, (it) => `meet ${it.director}`),
+    mastersProgress: await toCards(
+      mastersProgress.map((m) => ({ ...m.film, director: m.name, seen: m.seen })), key,
+      (it) => `${it.director} — you’ve seen ${it.seen}`,
+    ),
     moreFrom: await toCards(moreFrom.map((m) => ({ ...m.film, director: m.name })), key, (it) => `more ${it.director}`),
     faces: await toCards(faces.map((f) => ({ ...f, id: f.id })), key, (it) => `more ${it.actor}`),
     watchlistFirst: await toCards(watchlistCards.slice(0, 10), key, () => 'already on your list'),
   };
 
+  const joinGroups = [...Object.values(shelves), pool];
   const need = new Set();
-  for (const shelf of Object.values(shelves)) for (const c of shelf) if (c.imdbId) need.add(c.imdbId);
+  for (const group of joinGroups) for (const c of group) if (c.imdbId) need.add(c.imdbId);
   const ratingsMap = await imdbRatings(need);
-  for (const shelf of Object.values(shelves)) {
-    for (const c of shelf) {
+  for (const group of joinGroups) {
+    for (const c of group) {
       if (c.imdbId && ratingsMap.has(c.imdbId)) c.imdb = ratingsMap.get(c.imdbId);
       delete c.imdbId;
     }
@@ -312,7 +320,15 @@ export async function buildRecs(src, key) {
   // The floor: a recommendation shelf earns trust by what it refuses to show.
   const floor = (c) => (c.imdb?.rating ? c.imdb.rating >= 6.8 : (c.tmdb?.rating || 0) >= 7.2);
   shelves.because = shelves.because.filter(floor).slice(0, 12);
-  shelves.forYou = shelves.forYou.filter(floor).slice(0, 12);
+
+  // Carve the shared pool: the main shelf first, then the runtime shelves
+  // take what's left so nothing repeats.
+  const poolOk = pool.filter(floor);
+  shelves.forYou = poolOk.slice(0, 12);
+  const used = new Set([...shelves.forYou, ...shelves.because].map((c) => c.tmdbId));
+  shelves.shortReel = poolOk.filter((c) => !used.has(c.tmdbId) && c.runtime > 0 && c.runtime <= 105).slice(0, 8);
+  shelves.shortReel.forEach((c) => used.add(c.tmdbId));
+  shelves.longHaul = poolOk.filter((c) => !used.has(c.tmdbId) && c.runtime >= 150).slice(0, 8);
 
   shelves.franchises = franchises.slice(0, 8);
 
