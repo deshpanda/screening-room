@@ -57,6 +57,18 @@ function parseWatches(xml) {
     const title = tag(item, 'letterboxd:filmTitle');
     const watchedDate = tag(item, 'letterboxd:watchedDate');
     if (!title || !watchedDate) continue; // list items etc.
+    // The feed carries any review text inside the description HTML —
+    // strip the poster image and boilerplate, keep the prose.
+    const desc = tag(item, 'description');
+    const reviewText = desc
+      .replace(/<img[^>]*>/g, '')
+      .replace(/<\/p>\s*<p>/g, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .split('\n\n')
+      .filter((p) => p.trim() && !/^\s*Watched on /i.test(p))
+      .join('\n\n')
+      .trim();
+
     watches.push({
       name: title,
       year: tag(item, 'letterboxd:filmYear'),
@@ -64,6 +76,7 @@ function parseWatches(xml) {
       rewatch: /^yes$/i.test(tag(item, 'letterboxd:rewatch')),
       rating: parseFloat(tag(item, 'letterboxd:memberRating')) || null,
       tmdbId: tag(item, 'tmdb:movieId') || null,
+      reviewText: reviewText || null,
     });
   }
   // oldest first so diary order stays chronological
@@ -79,6 +92,7 @@ async function enrichById(tmdbId, key) {
   const d = await res.json();
   return {
     tmdbId: Number(tmdbId),
+    poster: d.poster_path || null,
     collection: d.belongs_to_collection
       ? { id: d.belongs_to_collection.id, name: d.belongs_to_collection.name }
       : null,
@@ -125,6 +139,13 @@ for (const w of feed) {
     if (f) { src.films[key] = f; enriched++; }
     await new Promise((r) => setTimeout(r, 150));
   }
+  if (w.reviewText) {
+    src.reviews = src.reviews || [];
+    const rk = `${w.name}|${w.year}|${w.watchedDate}`;
+    if (!src.reviews.some((r) => `${r.name}|${r.year}|${r.watchedDate}` === rk)) {
+      src.reviews.push({ name: w.name, year: w.year, watchedDate: w.watchedDate, rating: w.rating, text: w.reviewText });
+    }
+  }
 }
 
 if (!added) {
@@ -146,6 +167,6 @@ writeFileSync(OUT_PATH, await encryptVault(insights, VAULT_PASS));
 writeFileSync(SRC_PATH, await encryptVault({
   diary: src.diary, watched: src.watched, ratings: src.ratings,
   watchlist: src.watchlist || [], watchlistCount: src.watchlistCount,
-  films: src.films, displayName: src.displayName,
+  reviews: src.reviews || [], films: src.films, displayName: src.displayName,
 }, VAULT_PASS));
 console.log(`CHANGED — merged ${added} new diary entr${added === 1 ? 'y' : 'ies'} (${enriched} newly enriched). Now ${insights.totals.diaryEntries} entries, ${insights.totals.uniqueFilms} films.`);

@@ -19,7 +19,8 @@ anyone else ──────────────────────�
 | **Overview** | Hours in the dark, stat tiles, a year-by-year watch heatmap on one shared scale, the recent diary and the five-star shelf |
 | **Stats** | Films per year, a ratings histogram, habits and streaks, taste by genre/decade/runtime, the terra-incognita coverage matrix, most-watched directors and faces, a you-vs-the-crowd scatter, and a wrapped card for every year |
 | **Next** | The recommendation desk (below) |
-| **Archive** | The full diary — searchable, paginated, every title linked to its Letterboxd page |
+| **School** | A seven-course film-school syllabus graded against the diary, plus a four-week term plan cut fresh each print |
+| **Archive** | The full diary — searchable and filterable by year, rating and rewatches — plus the margins: every review the owner has written, fed automatically from the feed |
 
 ## The recommendation desk
 

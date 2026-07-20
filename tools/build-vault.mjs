@@ -71,7 +71,15 @@ function loadExport(dir) {
   const watchlist = readCsv(dir, 'watchlist.csv')
     .map((r) => ({ name: col(r, 'Name'), year: col(r, 'Year') }))
     .filter((w) => w.name);
-  return { diary, watched, ratings, watchlist, watchlistCount: watchlist.length };
+  const reviews = readCsv(dir, 'reviews.csv')
+    .map((r) => ({
+      name: col(r, 'Name'), year: col(r, 'Year'),
+      watchedDate: col(r, 'Watched Date') || col(r, 'Date'),
+      rating: parseFloat(col(r, 'Rating')) || null,
+      text: col(r, 'Review'),
+    }))
+    .filter((r) => r.name && r.text);
+  return { diary, watched, ratings, watchlist, watchlistCount: watchlist.length, reviews };
 }
 
 // ---- TMDB enrichment (cached, throttled) -----------------------------------
@@ -114,6 +122,7 @@ async function enrich(uniqueFilms, key) {
         const director = detail.credits?.crew?.find((c) => c.job === 'Director')?.name || null;
         cache[k] = {
           tmdbId: hit.id,
+          poster: detail.poster_path || null,
           collection: detail.belongs_to_collection
             ? { id: detail.belongs_to_collection.id, name: detail.belongs_to_collection.name }
             : null,
@@ -240,7 +249,7 @@ writeFileSync(OUT_PATH, await encryptVault(insights, p1));
 writeFileSync(SRC_PATH, await encryptVault({
   diary: data.diary, watched: data.watched, ratings: data.ratings,
   watchlist: data.watchlist || [], watchlistCount: data.watchlistCount,
-  films: data.films, displayName: data.displayName,
+  reviews: data.reviews || [], films: data.films, displayName: data.displayName,
 }, p1));
 console.log(`\nWrote ${OUT_PATH} (${Math.round(readFileSync(OUT_PATH).length / 1024)} KB) and ${SRC_PATH} (${Math.round(readFileSync(SRC_PATH).length / 1024)} KB), both AES-256-GCM.`);
 console.log('Commit data/ and push. The passphrase itself is stored nowhere.');

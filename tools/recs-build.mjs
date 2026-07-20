@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES } from '../lib/recs.js';
+import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS } from '../lib/recs.js';
 import { filmKey } from '../lib/insights.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -408,6 +408,56 @@ export async function buildRecs(src, key) {
   shelves.canon = CANON_DIRECTORS
     .map((name) => ({ name, seen: watchedDirectorsCount.get(name) || 0 }))
     .sort((a, b) => b.seen - a.seen || a.name.localeCompare(b.name));
+
+  // Film school: resolve the syllabus against TMDB, mark what's screened.
+  console.log('  recs: grading the film-school transcript…');
+  const school = { courses: [], done: 0, total: 0 };
+  for (const course of SYLLABUS) {
+    const courseFilms = [];
+    for (const [title, year, why] of course.films) {
+      let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
+      if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
+      await sleep(80);
+      const hit = s?.results?.[0];
+      const watched = (hit && exclude.has(hit.id)) || exclude.has(`${normTitle(title)} ${year}`);
+      courseFilms.push({
+        title, year, why, watched,
+        tmdbId: hit?.id || null,
+        poster: hit?.poster_path || null,
+        tmdb: hit?.vote_average ? Math.round(hit.vote_average * 10) / 10 : null,
+      });
+      school.total++;
+      if (watched) school.done++;
+    }
+    school.courses.push({ code: course.code, title: course.title, films: courseFilms });
+  }
+  shelves.school = school;
+
+  // Season pass: the four-week term plan, cut fresh with every print.
+  const seasonPass = [];
+  const addWeek = (label, card) => {
+    if (card && !seasonPass.some((w) => w.card.tmdbId === card.tmdbId)) {
+      seasonPass.push({ week: seasonPass.length + 1, label, card });
+    }
+  };
+  if (shelves.spotlight?.films?.[0]) {
+    addWeek(`the spotlight — ${shelves.spotlight.name}`, shelves.spotlight.films[0]);
+  }
+  for (const course of school.courses) {
+    const next = course.films.find((f) => !f.watched && f.tmdbId);
+    if (next) {
+      addWeek(`film school, ${course.code}`, {
+        tmdbId: next.tmdbId, title: next.title, year: next.year, poster: next.poster,
+        tmdb: next.tmdb ? { rating: next.tmdb } : null, runtime: null, genres: [],
+        imdb: null, why: next.why,
+      });
+      break;
+    }
+  }
+  addWeek('off your watchlist', shelves.watchlistFirst[0]);
+  addWeek('terra incognita', shelves.gapFillers[0]);
+  addWeek('for you', shelves.forYou[0]);
+  shelves.seasonPass = seasonPass.slice(0, 4);
 
   const total = Object.values(shelves)
     .reduce((s, x) => s + (Array.isArray(x) ? x.length : (x?.films?.length || 0)), 0);

@@ -379,6 +379,53 @@ a.spot-name:hover { color: var(--amber); }
 .scatter-caption { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; }
 .scatter-caption span { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); letter-spacing: 0.04em; }
 
+/* the wall — five-star poster mosaic */
+.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.wall-card img {
+  width: 100%; aspect-ratio: 2 / 3; object-fit: cover; display: block;
+  border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.wall-card:hover img { transform: scale(1.03); border-color: var(--amber); }
+
+/* film school */
+.week-cell { display: flex; flex-direction: column; gap: 8px; }
+.week-k {
+  font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--amber); margin: 0; max-width: 150px;
+}
+.course-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 26px 0 6px;
+}
+.course-code { font-family: var(--mono); font-size: 0.8rem; color: var(--amber); margin: 0; letter-spacing: 0.14em; }
+.course-title { font-weight: 700; }
+.course-score { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); margin-left: auto; }
+.course-list li { flex-wrap: wrap; }
+.course-list .tick { font-family: var(--mono); width: 1.4em; color: var(--faint); }
+.course-list li.screened .tick { color: var(--amber); font-weight: 700; }
+.course-list li.screened { color: var(--text); }
+.course-list li:not(.screened) { color: var(--muted); }
+.why-inline { flex: 1 1 100%; font-size: 0.78rem; font-style: italic; color: var(--faint); padding-left: 1.9em; }
+@media (min-width: 800px) {
+  .why-inline { flex: 1; padding-left: 12px; }
+}
+
+/* archive power filters */
+.archive-selects { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.archive-selects select {
+  font: inherit; font-family: var(--mono); font-size: 0.74rem; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 6px 9px;
+}
+.rw-filter { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
+/* the margins — reviews */
+.review { border-bottom: 1px dashed var(--line); padding: 14px 0; }
+.review:last-child { border-bottom: 0; }
+.review-head { margin: 0 0 6px; font-size: 0.92rem; }
+.review-head .d { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); margin-right: 8px; }
+.review-text { margin: 0; white-space: pre-wrap; color: var(--text); font-size: 0.95rem; line-height: 1.7; max-width: 74ch; }
+
 /* tooltip */
 #tip {
   position: fixed; z-index: 10; pointer-events: none; display: none;

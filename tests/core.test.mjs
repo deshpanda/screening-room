@@ -265,6 +265,21 @@ test('recs: genre affinity rewards overlap and never zeroes out', () => {
   assert.ok(genreAffinity(['Crime'], ['Comedy']) >= 0.4);
 });
 
+test('insights: reviews pass through with letterboxd ids, newest first', () => {
+  const data = {
+    ...fixture(),
+    reviews: [
+      { name: 'Heat', year: '1995', watchedDate: '2026-01-01', rating: 5, text: 'The diner scene alone.' },
+      { name: 'Stalker', year: '1979', watchedDate: '2026-02-10', rating: 4.5, text: 'The Zone is a mood.' },
+    ],
+  };
+  const r = computeInsights(data);
+  assert.equal(r.reviews.length, 2);
+  assert.equal(r.reviews[0].t, 'Stalker'); // newest first
+  assert.equal(r.reviews[1].tid, 949);     // Heat's TMDB id
+  assert.equal(r.reviews[1].text, 'The diner scene alone.');
+});
+
 test('insights: empty input does not crash', () => {
   const r = computeInsights({ diary: [], watched: [], ratings: [], films: {} });
   assert.equal(r.totals.uniqueFilms, 0);

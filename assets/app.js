@@ -102,6 +102,7 @@ const NAV = [
   ['overview', 'Overview', ''],
   ['stats', 'Stats', 'stats/'],
   ['next', 'Next', 'next/'],
+  ['school', 'School', 'school/'],
   ['archive', 'Archive', 'archive/'],
 ];
 
@@ -170,13 +171,41 @@ function secTiles(v, wrap) {
 
 function secReel(v, wrap) {
   const hm = block('The reel — year by year', 'one cell per day, one scale');
+  // titles per day, so a cell can name its films on hover
+  const titles = new Map();
+  for (const r of v.ledger || []) {
+    if (!titles.has(r.d)) titles.set(r.d, []);
+    titles.get(r.d).push(r.t);
+  }
   for (const yr of v.heatmapYears || []) {
     const strip = h('div', 'yearstrip');
     strip.appendChild(h('div', 'yearlabel', `${yr.year} — ${yr.count} film${yr.count === 1 ? '' : 's'}`));
-    strip.appendChild(heatmap(yr.byDate, { weeks: YEAR_WEEKS }));
+    strip.appendChild(heatmap(yr.byDate, { weeks: YEAR_WEEKS, titles }));
     hm.appendChild(strip);
   }
   wrap.appendChild(hm);
+}
+
+function secWall(v, wrap) {
+  const posters = (v.fiveStar || []).filter((f) => f.poster);
+  if (posters.length < 3) return;
+  const wall = block('The wall', 'five stars only');
+  const grid = h('div', 'wall');
+  for (const f of posters) {
+    const a = h('a', 'wall-card');
+    a.href = lbUrl(f.tid);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.alt = `${f.title} poster`;
+    img.src = `https://image.tmdb.org/t/p/w342${f.poster}`;
+    img.title = `${f.title} (${f.year})`;
+    a.appendChild(img);
+    grid.appendChild(a);
+  }
+  wall.appendChild(grid);
+  wrap.appendChild(wall);
 }
 
 function secRecent(v, wrap) {
@@ -403,7 +432,7 @@ function secVerdicts(v, wrap) {
     const ps = h('div', 'panel');
     ps.style.marginTop = '14px';
     ps.appendChild(h('h4', null, 'You vs the crowd — every rated film'));
-    ps.appendChild(scatterChart(v.calibration));
+    ps.appendChild(scatterChart(v.calibration, { href: (p) => (p.tid ? lbUrl(p.tid) : null) }));
     ps.appendChild(h('p', 'hint-line', 'above the line: you liked it more than the crowd · below: less'));
     verdicts.appendChild(ps);
   }
@@ -746,6 +775,52 @@ function secNext(v, wrap) {
   wrap.appendChild(rx);
 }
 
+// ---------- sections: school ----------
+function secSchool(v, wrap) {
+  const school = v.recs?.school;
+  if (!school) return;
+
+  // the term plan
+  if (v.recs.seasonPass?.length) {
+    const sp = block('The term plan', 'four weeks, cut fresh each print');
+    const row = h('div', 'shelf');
+    for (const w of v.recs.seasonPass) {
+      const cell = h('div', 'week-cell');
+      cell.appendChild(h('p', 'week-k', `Week ${w.week} · ${w.label}`));
+      cell.appendChild(buildCard(w.card, true));
+      row.appendChild(cell);
+    }
+    sp.appendChild(row);
+    wrap.appendChild(sp);
+  }
+
+  // the transcript
+  const fs = block('Film school', `${school.done} of ${school.total} screened`);
+  for (const course of school.courses) {
+    const doneHere = course.films.filter((f) => f.watched).length;
+    const head = h('div', 'course-head');
+    head.appendChild(h('h4', 'course-code', course.code));
+    head.appendChild(h('span', 'course-title', course.title));
+    head.appendChild(h('span', 'course-score', `${doneHere}/${course.films.length}`));
+    fs.appendChild(head);
+    const ul = h('ul', 'diary course-list');
+    for (const f of course.films) {
+      const li = h('li', f.watched ? 'screened' : '');
+      li.appendChild(h('span', 'tick', f.watched ? '✓' : '○'));
+      const t = h('span', 't');
+      t.appendChild(filmLink(f.tmdbId, f.title));
+      t.appendChild(document.createTextNode(' '));
+      t.appendChild(h('span', 'y', `(${f.year})`));
+      li.appendChild(t);
+      li.appendChild(h('span', 'why-inline', f.why));
+      if (f.tmdb) li.appendChild(h('span', 'extra', `${f.tmdb} tmdb`));
+      ul.appendChild(li);
+    }
+    fs.appendChild(ul);
+  }
+  wrap.appendChild(fs);
+}
+
 // ---------- sections: archive ----------
 function secThisWeek(v, wrap) {
   if (!v.thisWeek || !v.thisWeek.length) return;
@@ -776,6 +851,35 @@ function secArchive(v, wrap) {
   inp.placeholder = 'grep the diary — title or year…';
   inp.setAttribute('aria-label', 'Filter the diary');
   filt.appendChild(inp);
+
+  // power filters: watch-year, rating band, rewatches
+  const fYear = h('select');
+  {
+    const o = h('option', null, 'any year');
+    o.value = 'any';
+    fYear.appendChild(o);
+    for (const y of [...new Set(v.ledger.map((r) => r.d.slice(0, 4)))].sort().reverse()) {
+      const oy = h('option', null, y);
+      oy.value = y;
+      fYear.appendChild(oy);
+    }
+  }
+  const fRate = h('select');
+  for (const [val, label] of [['any', 'any rating'], ['5', '5★ only'], ['4', '4★ and up'], ['low', '2★ and under'], ['none', 'unrated']]) {
+    const o = h('option', null, label);
+    o.value = val;
+    fRate.appendChild(o);
+  }
+  const fRw = h('label', 'rw-filter');
+  const rwBox = h('input');
+  rwBox.type = 'checkbox';
+  fRw.appendChild(rwBox);
+  fRw.appendChild(document.createTextNode(' rewatches only'));
+  const row = h('div', 'archive-selects');
+  row.appendChild(fYear);
+  row.appendChild(fRate);
+  row.appendChild(fRw);
+  filt.appendChild(row);
   pa2.appendChild(filt);
 
   const ul2 = h('ul', 'diary');
@@ -811,18 +915,26 @@ function secArchive(v, wrap) {
   let cap = PAGE_SIZE;
   function applyFilter() {
     const q = inp.value.trim().toLowerCase();
+    const anyFilter = q || fYear.value !== 'any' || fRate.value !== 'any' || rwBox.checked;
     let matches = 0;
     let shown = 0;
-    for (const li of rows) {
-      const hit = !q || li.dataset.q.includes(q);
+    rows.forEach((li, i) => {
+      const r = v.ledger[i];
+      let hit = !q || li.dataset.q.includes(q);
+      if (hit && fYear.value !== 'any') hit = r.d.startsWith(fYear.value);
+      if (hit && fRate.value === '5') hit = r.r === 5;
+      else if (hit && fRate.value === '4') hit = r.r >= 4;
+      else if (hit && fRate.value === 'low') hit = r.r !== null && r.r <= 2;
+      else if (hit && fRate.value === 'none') hit = r.r === null;
+      if (hit && rwBox.checked) hit = r.w;
       if (hit) matches++;
-      const show = hit && (q ? true : shown < cap);
+      const show = hit && (anyFilter ? true : shown < cap);
       if (show) shown++;
       li.style.display = show ? '' : 'none';
-    }
-    more.style.display = !q && cap < rows.length ? '' : 'none';
-    less.style.display = !q && cap > PAGE_SIZE ? '' : 'none';
-    count.textContent = q
+    });
+    more.style.display = !anyFilter && cap < rows.length ? '' : 'none';
+    less.style.display = !anyFilter && cap > PAGE_SIZE ? '' : 'none';
+    count.textContent = anyFilter
       ? `${matches} match${matches === 1 ? '' : 'es'} of ${rows.length}`
       : `showing ${Math.min(cap, rows.length)} of ${rows.length}`;
   }
@@ -833,18 +945,56 @@ function secArchive(v, wrap) {
     ar.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'start' });
   });
   inp.addEventListener('input', applyFilter);
+  fYear.addEventListener('change', applyFilter);
+  fRate.addEventListener('change', applyFilter);
+  rwBox.addEventListener('change', applyFilter);
   applyFilter();
 
   ar.appendChild(pa2);
   wrap.appendChild(ar);
 }
 
+function secReviews(v, wrap) {
+  if (!v.reviews || !v.reviews.length) return;
+  const mb = block('The margins', `${v.reviews.length} review${v.reviews.length === 1 ? '' : 's'}, in your own hand`);
+  const panel = h('div', 'panel');
+  const filt = h('div', 'archive-filter');
+  const inp = h('input');
+  inp.type = 'search';
+  inp.placeholder = 'search your reviews…';
+  inp.setAttribute('aria-label', 'Search reviews');
+  filt.appendChild(inp);
+  panel.appendChild(filt);
+  const list = h('div');
+  const cards = v.reviews.map((r) => {
+    const card = h('div', 'review');
+    const head = h('p', 'review-head');
+    head.appendChild(h('span', 'd', r.d));
+    head.appendChild(document.createTextNode(' '));
+    head.appendChild(filmLink(r.tid, `${r.t} (${r.y})`));
+    if (r.r) head.appendChild(h('span', 'stars', ' ' + stars(r.r)));
+    card.appendChild(head);
+    card.appendChild(h('p', 'review-text', r.text));
+    card.dataset.q = (r.t + ' ' + r.y + ' ' + r.text).toLowerCase();
+    list.appendChild(card);
+    return card;
+  });
+  panel.appendChild(list);
+  inp.addEventListener('input', () => {
+    const q = inp.value.trim().toLowerCase();
+    for (const c of cards) c.style.display = !q || c.dataset.q.includes(q) ? '' : 'none';
+  });
+  mb.appendChild(panel);
+  wrap.appendChild(mb);
+}
+
 // ---------- page assembly ----------
 const PAGES = {
-  overview: [secHero, secTiles, secReel, secRecent],
+  overview: [secHero, secTiles, secReel, secRecent, secWall],
   stats: [secYears, secHabits, secTaste, secGaps, secPeople, secRange, secVerdicts, secYearReview],
   next: [secNext],
-  archive: [secThisWeek, secArchive],
+  school: [secSchool],
+  archive: [secThisWeek, secReviews, secArchive],
 };
 
 function renderPage(v) {
