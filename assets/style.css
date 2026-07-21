@@ -476,3 +476,24 @@ footer.credits {
 }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- the seminar room ---- */
+ol.method { margin: 0; padding-left: 1.2rem; display: grid; gap: .55rem; }
+ol.method li { font-size: .92rem; color: var(--ink); line-height: 1.5; }
+ol.method li::marker { color: var(--amber); font-family: var(--mono); font-size: .8rem; }
+.lexicon { columns: 2; column-gap: 2.2rem; }
+.lex-entry { break-inside: avoid; margin-bottom: .95rem; font-size: .88rem; line-height: 1.5; }
+.lex-term { display: block; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: .78rem; color: var(--amber); margin-bottom: .15rem; }
+.lex-def { color: var(--ink); }
+.lex-see { display: block; font-family: var(--mono); font-size: .74rem; color: var(--faint); margin-top: .2rem; }
+@media (max-width: 700px) { .lexicon { columns: 1; } }
+
+/* ---- the projectionist's log ---- */
+ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--faint); }
+
+/* ---- reel progress ---- */
+#reelbar { position: fixed; top: 0; left: 0; height: 2px; width: 0; background: var(--amber); z-index: 60; opacity: .85; transition: width .12s linear; pointer-events: none; }
+
+/* ---- projector glow behind the hero ---- */
+.hero { position: relative; }
+.hero::before { content: ''; position: absolute; inset: -18% -10% auto -10%; height: 130%; background: radial-gradient(ellipse 55% 60% at 50% 8%, rgba(230, 166, 72, .07), transparent 70%); pointer-events: none; }

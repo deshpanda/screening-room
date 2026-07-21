@@ -243,6 +243,26 @@ if (!p1 || p1 !== p2) {
   process.exit(1);
 }
 
+// Carry the projectionist's log across full rebuilds: if the old source.enc
+// opens with this passphrase, keep its print history and add a line for this cut.
+let printHistory = [];
+try {
+  const { decryptVault } = await import('../lib/vaultcrypto.js');
+  const prev = await decryptVault(readFileSync(SRC_PATH, 'utf8'), p1);
+  printHistory = prev.printHistory || [];
+} catch { /* fresh vault or re-key — the log starts over */ }
+const printLine = {
+  d: data.generatedAt,
+  n: `full print — ${insights.totals.diaryEntries} entries, ${insights.totals.uniqueFilms} films`,
+};
+// same-day rebuilds collapse into one line
+while (printHistory.length
+  && printHistory[printHistory.length - 1].d === printLine.d
+  && printHistory[printHistory.length - 1].n.startsWith('full print')) printHistory.pop();
+printHistory = [...printHistory, printLine].slice(-80);
+insights.printHistory = printHistory;
+data.printHistory = printHistory;
+
 writeFileSync(OUT_PATH, await encryptVault(insights, p1));
 // The raw rows + enrichment, same passphrase — lets the scheduled RSS
 // updater merge new watches without ever needing the export again.
@@ -250,6 +270,7 @@ writeFileSync(SRC_PATH, await encryptVault({
   diary: data.diary, watched: data.watched, ratings: data.ratings,
   watchlist: data.watchlist || [], watchlistCount: data.watchlistCount,
   reviews: data.reviews || [], films: data.films, displayName: data.displayName,
+  printHistory: data.printHistory,
 }, p1));
 console.log(`\nWrote ${OUT_PATH} (${Math.round(readFileSync(OUT_PATH).length / 1024)} KB) and ${SRC_PATH} (${Math.round(readFileSync(SRC_PATH).length / 1024)} KB), both AES-256-GCM.`);
 console.log('Commit data/ and push. The passphrase itself is stored nowhere.');

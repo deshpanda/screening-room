@@ -11,7 +11,7 @@ import {
   h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block,
   resetBlockCounter, scatterChart,
 } from '../lib/render.js';
-import { READING_SHELF, THEORY_SHELF } from '../lib/recs.js';
+import { READING_SHELF, THEORY_SHELF, LEXICON, METHOD } from '../lib/recs.js';
 
 const PAGE = document.body.dataset.page || 'overview';
 const BASE = PAGE === 'overview' ? '' : '../';
@@ -616,6 +616,7 @@ function secNext(v, wrap) {
     };
     const btn = h('button', 'btn', 'Roll the projector');
     btn.type = 'button';
+    btn.id = 'roll-btn';
     const dfBtn = h('button', 'btn', 'Double feature');
     dfBtn.type = 'button';
     const hrs = h('select');
@@ -936,6 +937,40 @@ function secSchool(v, wrap) {
   g.appendChild(shelfList('The theory shelf — arguments', THEORY_SHELF));
   rs.appendChild(g);
   wrap.appendChild(rs);
+
+  // the seminar room: the method, then the working vocabulary — every term
+  // anchored to the syllabus film that teaches it
+  const sem = block('The seminar room', 'talk like you studied here');
+  const normLex = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const filmIdx = new Map();
+  for (const c of school.courses) {
+    for (const f of c.films) filmIdx.set(normLex(f.title), f);
+    if (c.extra) filmIdx.set(normLex(c.extra.title), c.extra);
+  }
+  const mp = h('div', 'panel');
+  mp.appendChild(h('h4', null, 'How to read a film — the method'));
+  const ml = h('ol', 'method');
+  for (const line of METHOD) ml.appendChild(h('li', null, line));
+  mp.appendChild(ml);
+  sem.appendChild(mp);
+  const lp = h('div', 'panel');
+  lp.appendChild(h('h4', null, `The working vocabulary — ${LEXICON.length} terms`));
+  const dl = h('div', 'lexicon');
+  for (const [term, def, seeIn] of LEXICON) {
+    const en = h('div', 'lex-entry');
+    en.appendChild(h('span', 'lex-term', term));
+    en.appendChild(h('span', 'lex-def', def + '. '));
+    const see = h('span', 'lex-see');
+    see.appendChild(document.createTextNode('see it in: '));
+    const f = filmIdx.get(normLex(seeIn));
+    see.appendChild(f?.tmdbId ? filmLink(f.tmdbId, seeIn) : h('em', null, seeIn));
+    if (f?.watched) see.appendChild(document.createTextNode(' ✓'));
+    en.appendChild(see);
+    dl.appendChild(en);
+  }
+  lp.appendChild(dl);
+  sem.appendChild(lp);
+  wrap.appendChild(sem);
 }
 
 // ---------- sections: archive ----------
@@ -1166,12 +1201,29 @@ function buildMargins(v) {
 }
 
 // ---------- page assembly ----------
+// The projectionist's log — one dated line per print of this site.
+function secPrints(v, wrap) {
+  if (!v.printHistory || !v.printHistory.length) return;
+  const pr = block('The projectionist’s log', 'every print, dated and noted');
+  const pp = h('div', 'panel');
+  const ul = h('ul', 'diary printlog');
+  for (const e of [...v.printHistory].reverse().slice(0, 40)) {
+    const li = h('li');
+    li.appendChild(h('span', 'd', e.d));
+    li.appendChild(h('span', 't', e.n));
+    ul.appendChild(li);
+  }
+  pp.appendChild(ul);
+  pr.appendChild(pp);
+  wrap.appendChild(pr);
+}
+
 const PAGES = {
   overview: [secHero, secTiles, secReel, secRecent, secWall],
   stats: [secYears, secHabits, secTaste, secGaps, secPeople, secRange, secVerdicts, secYearReview],
   next: [secNext],
   school: [secSchool],
-  archive: [secThisWeek, secArchive],
+  archive: [secThisWeek, secArchive, secPrints],
 };
 
 function renderPage(v) {
@@ -1185,6 +1237,32 @@ function renderPage(v) {
   root.appendChild(wrap);
   window.scrollTo(0, 0);
   polish(wrap);
+  chrome();
+}
+
+// Once-per-session page chrome: the reel-progress line and keyboard shortcuts.
+function chrome() {
+  if (document.getElementById('reelbar')) return;
+  const bar = h('div');
+  bar.id = 'reelbar';
+  document.body.appendChild(bar);
+  const track = () => {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = max > 0 ? `${Math.min(100, (window.scrollY / max) * 100)}%` : '0%';
+  };
+  addEventListener('scroll', track, { passive: true });
+  addEventListener('resize', track, { passive: true });
+  addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const tag = (e.target?.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (e.key === '/') {
+      const s = document.querySelector('input[type="search"]');
+      if (s) { e.preventDefault(); s.focus(); }
+    } else if (e.key === 'r') {
+      document.getElementById('roll-btn')?.click();
+    }
+  });
 }
 
 // ---------- motion: count-ups and scroll-reveal (skipped for reduced motion) --

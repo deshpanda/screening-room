@@ -423,16 +423,28 @@ export async function buildRecs(src, key) {
   }
   const letterOf = (gpa) => (gpa >= 3.7 ? 'A' : gpa >= 3.3 ? 'A-' : gpa >= 3.0 ? 'B+' : gpa >= 2.7 ? 'B' : gpa >= 2.3 ? 'B-' : 'C');
 
+  // Long comma-laden titles (Jeanne Dielman…) defeat TMDB search outright;
+  // retry on the pre-comma stem but accept only an exact normalized-title match,
+  // so a making-of documentary can't stand in for the film.
+  const searchSyllabusFilm = async (title, year) => {
+    let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
+    if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
+    if (!s?.results?.length && title.includes(',')) {
+      const stem = await tmdb('/search/movie', { query: title.split(',')[0] }, key);
+      const want = normTitle(title);
+      s = { results: (stem?.results || []).filter((r) => normTitle(r.title) === want) };
+    }
+    await sleep(80);
+    return s?.results?.[0];
+  };
+
   const school = { courses: [], done: 0, total: 0 };
   const allGrades = [];
   for (const course of SYLLABUS) {
     const courseFilms = [];
     const courseGrades = [];
     for (const [title, year, why] of course.films) {
-      let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
-      if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
-      await sleep(80);
-      const hit = s?.results?.[0];
+      const hit = await searchSyllabusFilm(title, year);
       const watched = (hit && exclude.has(hit.id)) || exclude.has(`${normTitle(title)} ${year}`);
       const userRating = watched
         ? (hit && ratingByTmdbId.get(hit.id)) || ratingByNorm.get(normTitle(title)) || null
@@ -451,10 +463,7 @@ export async function buildRecs(src, key) {
     let extra = null;
     if (SYLLABUS_EXTRAS[course.code]) {
       const [xt, xy, xwhy] = SYLLABUS_EXTRAS[course.code];
-      let xs = await tmdb('/search/movie', { query: xt, primary_release_year: xy }, key);
-      if (!xs?.results?.length) xs = await tmdb('/search/movie', { query: xt }, key);
-      await sleep(80);
-      const xhit = xs?.results?.[0];
+      const xhit = await searchSyllabusFilm(xt, xy);
       extra = {
         title: xt, year: xy, why: xwhy,
         tmdbId: xhit?.id || null,

@@ -84,7 +84,11 @@ and draws. The pure core — CSV parsing, the insights engine, the
 recommendation ranker, the crypto round-trip — is covered by `node --test`.
 
 Owner's operations (re-keying the passphrase, full rebuilds, two-seater
-mode) are documented in [`DEPLOY.md`](DEPLOY.md).
+mode) are documented in [`DEPLOY.md`](DEPLOY.md). If the passphrase slips
+the owner's mind, the reminder lives in a
+[private doc](https://docs.google.com/document/d/11PAyjL1kxh_0asDNkj2pQxas93TDsd0jBcztLVHIcQ4/edit)
+only the owner's account can open — and worst case, nothing is lost: the
+vault rebuilds from a fresh Letterboxd export with a new key.
 
 ---
 

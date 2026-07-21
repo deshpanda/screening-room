@@ -161,6 +161,9 @@ const insights = computeInsights(src);
 // what this print changed — shown beside the print date in the masthead
 insights.printNote = `+${added} film${added === 1 ? '' : 's'}`
   + (newReviews ? `, +${newReviews} review${newReviews === 1 ? '' : 's'}` : '');
+// the projectionist's log — one line per print, kept inside the vault
+src.printHistory = [...(src.printHistory || []), { d: src.generatedAt, n: insights.printNote }].slice(-80);
+insights.printHistory = src.printHistory;
 
 if (TMDB_KEY) {
   console.log('Rebuilding recommendation shelves…');
@@ -173,5 +176,6 @@ writeFileSync(SRC_PATH, await encryptVault({
   diary: src.diary, watched: src.watched, ratings: src.ratings,
   watchlist: src.watchlist || [], watchlistCount: src.watchlistCount,
   reviews: src.reviews || [], films: src.films, displayName: src.displayName,
+  printHistory: src.printHistory,
 }, VAULT_PASS));
 console.log(`CHANGED — merged ${added} new diary entr${added === 1 ? 'y' : 'ies'} (${enriched} newly enriched). Now ${insights.totals.diaryEntries} entries, ${insights.totals.uniqueFilms} films.`);
