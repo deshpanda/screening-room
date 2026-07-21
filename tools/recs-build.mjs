@@ -438,6 +438,21 @@ export async function buildRecs(src, key) {
     return s?.results?.[0];
   };
 
+  // the professor names the director: enrichment already knows it for watched
+  // films; unwatched syllabus films cost one credits call each
+  const dirCache = new Map();
+  const directorOf = async (id, filmKey2) => {
+    const known = films[filmKey2]?.director;
+    if (known) return known;
+    if (!id) return null;
+    if (dirCache.has(id)) return dirCache.get(id);
+    const d = await tmdb(`/movie/${id}`, { append_to_response: 'credits' }, key);
+    await sleep(80);
+    const name = (d?.credits?.crew || []).find((c) => c.job === 'Director')?.name || null;
+    dirCache.set(id, name);
+    return name;
+  };
+
   const school = { courses: [], done: 0, total: 0 };
   const allGrades = [];
   for (const course of SYLLABUS) {
@@ -452,6 +467,7 @@ export async function buildRecs(src, key) {
       if (userRating) { courseGrades.push(userRating); allGrades.push(userRating); }
       courseFilms.push({
         title, year, why, watched, userRating,
+        director: await directorOf(hit?.id, `${title}|${year}`),
         tmdbId: hit?.id || null,
         poster: hit?.poster_path || null,
         tmdb: hit?.vote_average ? Math.round(hit.vote_average * 10) / 10 : null,
@@ -466,6 +482,7 @@ export async function buildRecs(src, key) {
       const xhit = await searchSyllabusFilm(xt, xy);
       extra = {
         title: xt, year: xy, why: xwhy,
+        director: await directorOf(xhit?.id, `${xt}|${xy}`),
         tmdbId: xhit?.id || null,
         watched: (xhit && exclude.has(xhit.id)) || exclude.has(`${normTitle(xt)} ${xy}`),
       };

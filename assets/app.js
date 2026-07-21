@@ -945,6 +945,14 @@ function secSchool(v, wrap) {
       t.appendChild(filmLink(f.tmdbId, f.title));
       t.appendChild(document.createTextNode(' '));
       t.appendChild(h('span', 'y', `(${f.year})`));
+      if (f.director) {
+        const d = h('a', 'course-dir', f.director);
+        d.href = dirUrl(f.director);
+        d.target = '_blank';
+        d.rel = 'noopener';
+        t.appendChild(document.createTextNode(' '));
+        t.appendChild(d);
+      }
       li.appendChild(t);
       li.appendChild(h('span', 'why-inline', f.why));
       if (f.userRating) li.appendChild(h('span', 'stars', stars(f.userRating)));
@@ -957,6 +965,7 @@ function secSchool(v, wrap) {
       fx.appendChild(h('span', 'tick', course.extra.watched ? '✓' : '+'));
       fx.appendChild(document.createTextNode('further screening: '));
       fx.appendChild(filmLink(course.extra.tmdbId, `${course.extra.title} (${course.extra.year})`));
+      if (course.extra.director) fx.appendChild(document.createTextNode(`, ${course.extra.director}`));
       fx.appendChild(document.createTextNode(` — ${course.extra.why}`));
       fs.appendChild(fx);
     }
