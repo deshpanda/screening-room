@@ -438,17 +438,18 @@ export async function buildRecs(src, key) {
     return s?.results?.[0];
   };
 
-  // the professor names the director: enrichment already knows it for watched
-  // films; unwatched syllabus films cost one credits call each
+  // the professor names the director — always from credits, and when a film
+  // is co-directed, the marquee name wins (highest TMDB person popularity:
+  // The General says Keaton, not Bruckman)
   const dirCache = new Map();
   const directorOf = async (id, filmKey2) => {
-    const known = films[filmKey2]?.director;
-    if (known) return known;
-    if (!id) return null;
+    if (!id) return films[filmKey2]?.director || null;
     if (dirCache.has(id)) return dirCache.get(id);
     const d = await tmdb(`/movie/${id}`, { append_to_response: 'credits' }, key);
     await sleep(80);
-    const name = (d?.credits?.crew || []).find((c) => c.job === 'Director')?.name || null;
+    const dirs = (d?.credits?.crew || []).filter((c) => c.job === 'Director');
+    dirs.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    const name = dirs[0]?.name || films[filmKey2]?.director || null;
     dirCache.set(id, name);
     return name;
   };
