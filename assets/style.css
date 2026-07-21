@@ -517,4 +517,4 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 .century-base { stroke: rgba(230, 166, 72, .25); stroke-width: 1; }
 .era { fill: rgba(230, 166, 72, .04); }
 .era-1 { fill: rgba(230, 166, 72, .09); }
-.era-label { text-transform: uppercase; letter-spacing: .08em; fill: var(--faint); }
+.era-label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .04em; fill: var(--faint); }
