@@ -9,7 +9,7 @@
 import { decryptWithKeyBytes, deriveKeyBytes, envelopeSalt, b64 } from '../lib/vaultcrypto.js';
 import {
   h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block,
-  resetBlockCounter, scatterChart,
+  resetBlockCounter, scatterChart, worldMap, centuryStrip,
 } from '../lib/render.js';
 import { READING_SHELF, THEORY_SHELF, LEXICON, METHOD } from '../lib/recs.js';
 
@@ -410,6 +410,63 @@ function secPeople(v, wrap) {
   }
   people.appendChild(g4);
   wrap.appendChild(people);
+}
+
+// ---------- sections: the map & the century ----------
+function secMap(v, wrap) {
+  if (!v.countryFilms || !Object.keys(v.countryFilms).length) return;
+  const mp = block('The map of world cinema', 'shaded by how much of each country you have screened');
+  const panel = h('div', 'panel');
+  mp.appendChild(panel);
+  wrap.appendChild(mp);
+  // the map paths are heavy — loaded only when this section renders
+  import('./worldmap.js').then(({ WORLD, WORLD_VIEW }) => {
+    const detail = h('div', 'map-detail');
+    const { node, lit, unmapped } = worldMap(WORLD, WORLD_VIEW, v.countryFilms, (name, films) => {
+      detail.innerHTML = '';
+      detail.appendChild(h('h4', null, `${name} — ${films.length} film${films.length === 1 ? '' : 's'}`));
+      const ul = h('ul', 'diary');
+      for (const f of films.slice(0, 14)) {
+        const li = h('li');
+        const t = h('span', 't', f.t + ' ');
+        t.appendChild(h('span', 'y', `(${f.y})`));
+        li.appendChild(t);
+        li.appendChild(h('span', 'stars', stars(f.r)));
+        ul.appendChild(li);
+      }
+      if (films.length > 14) {
+        const li = h('li');
+        li.appendChild(h('span', 'y', `…and ${films.length - 14} more`));
+        ul.appendChild(li);
+      }
+      detail.appendChild(ul);
+    });
+    panel.appendChild(node);
+    const bits = [`${lit} countries lit — click one`];
+    if (unmapped.length) {
+      bits.push(`off the map: ${unmapped.map((c) => `${c} ×${v.countryFilms[c].length}`).join(', ')}`);
+    }
+    panel.appendChild(h('p', 'map-caption', bits.join(' · ')));
+    panel.appendChild(detail);
+  });
+}
+
+function secCentury(v, wrap) {
+  if (!v.releaseYears || !v.releaseYears.length) return;
+  const cy = block('The century', 'a dot for every film, on the year it was made');
+  const panel = h('div', 'panel');
+  const endYear = Math.max(...v.releaseYears.map((r) => r.y), Number(v.generatedAt?.slice(0, 4)) || 2026);
+  const { node, gap } = centuryStrip(v.releaseYears, endYear);
+  panel.appendChild(node);
+  let cap = `${v.releaseYears.length} of ${endYear - 1895 + 1} release years visited`;
+  if (gap && gap.len >= 3) {
+    cap += ` · biggest blind spot: ${gap.from}–${gap.to}, ${gap.len} straight years without a single film`;
+  }
+  panel.appendChild(h('p', 'map-caption', cap));
+  cy.appendChild(panel);
+  wrap.appendChild(cy);
+  // arrive on the present, let the gaps pull you back
+  requestAnimationFrame(() => { node.scrollLeft = node.scrollWidth; });
 }
 
 function secRange(v, wrap) {
@@ -1220,7 +1277,7 @@ function secPrints(v, wrap) {
 
 const PAGES = {
   overview: [secHero, secTiles, secReel, secRecent, secWall],
-  stats: [secYears, secHabits, secTaste, secGaps, secPeople, secRange, secVerdicts, secYearReview],
+  stats: [secYears, secHabits, secTaste, secMap, secCentury, secGaps, secPeople, secRange, secVerdicts, secYearReview],
   next: [secNext],
   school: [secSchool],
   archive: [secThisWeek, secArchive, secPrints],

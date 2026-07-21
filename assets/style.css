@@ -497,3 +497,20 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 /* ---- projector glow behind the hero ---- */
 .hero { position: relative; }
 .hero::before { content: ''; position: absolute; inset: -18% -10% auto -10%; height: 130%; background: radial-gradient(ellipse 55% 60% at 50% 8%, rgba(230, 166, 72, .07), transparent 70%); pointer-events: none; }
+
+/* ---- the map of world cinema ---- */
+.worldmap svg { width: 100%; height: auto; display: block; background: rgba(0, 0, 0, .25); border-radius: 6px; }
+.worldmap .land { fill: #1d1913; stroke: #0e0c09; stroke-width: .5; }
+.worldmap .land.lit { fill: var(--amber); cursor: pointer; transition: filter .15s ease; }
+.worldmap .land.lit:hover { filter: brightness(1.25); }
+.map-caption { font-family: var(--mono); font-size: .74rem; color: var(--faint); margin-top: .7rem; }
+.map-detail { margin-top: .8rem; }
+.map-detail h4 { margin-bottom: .4rem; }
+
+/* ---- the century strip ---- */
+.century-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: .3rem; }
+.century-scroll svg { display: block; }
+.century-dot { fill: var(--amber); }
+.era { fill: transparent; }
+.era-1 { fill: rgba(230, 166, 72, .045); }
+.era-label { text-transform: uppercase; letter-spacing: .08em; fill: var(--faint); }
