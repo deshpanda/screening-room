@@ -508,9 +508,13 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 .map-detail h4 { margin-bottom: .4rem; }
 
 /* ---- the century strip ---- */
-.century-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: .3rem; }
+.century-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 14px; scrollbar-color: rgba(230, 166, 72, .35) transparent; scrollbar-width: thin; }
+.century-scroll::-webkit-scrollbar { height: 6px; }
+.century-scroll::-webkit-scrollbar-track { background: transparent; }
+.century-scroll::-webkit-scrollbar-thumb { background: rgba(230, 166, 72, .3); border-radius: 3px; }
 .century-scroll svg { display: block; }
 .century-dot { fill: var(--amber); }
-.era { fill: transparent; }
-.era-1 { fill: rgba(230, 166, 72, .045); }
+.century-base { stroke: rgba(230, 166, 72, .25); stroke-width: 1; }
+.era { fill: rgba(230, 166, 72, .04); }
+.era-1 { fill: rgba(230, 166, 72, .09); }
 .era-label { text-transform: uppercase; letter-spacing: .08em; fill: var(--faint); }
