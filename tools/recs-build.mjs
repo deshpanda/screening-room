@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS, SYLLABUS_EXTRAS } from '../lib/recs.js';
+import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS, SYLLABUS_EXTRAS, WINTER_FILMS } from '../lib/recs.js';
 import { filmKey } from '../lib/insights.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -60,6 +60,24 @@ async function imdbRatings(neededIds) {
 }
 
 // ---- card assembly ----------------------------------------------------------
+/**
+ * Resolve a curated "title (year)" to a TMDB hit. Comma-heavy titles defeat
+ * TMDB's search outright, so retry on the pre-comma stem but accept only an
+ * exact normalized-title match: a making-of documentary must never stand in
+ * for the film.
+ */
+async function searchFilm(title, year, key) {
+  let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
+  if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
+  if (!s?.results?.length && title.includes(',')) {
+    const stem = await tmdb('/search/movie', { query: title.split(',')[0] }, key);
+    const want = normTitle(title);
+    s = { results: (stem?.results || []).filter((r) => normTitle(r.title) === want) };
+  }
+  await sleep(80);
+  return s?.results?.[0];
+}
+
 async function toCards(items, key, whyOf = () => null) {
   const cards = [];
   for (const it of items) {
@@ -374,6 +392,28 @@ export async function buildRecs(src, key) {
     };
   }
 
+  // Frost and tinsel: curated, and watched films stay in on purpose.
+  console.log('  recs: stocking the winter shelf…');
+  const winterMeta = new Map();
+  for (const [title, year, why, vibe] of WINTER_FILMS) {
+    const hit = await searchFilm(title, year, key);
+    if (!hit) {
+      console.log(`    winter: no TMDB match for ${title} (${year})`);
+      continue;
+    }
+    winterMeta.set(hit.id, {
+      id: hit.id,
+      why,
+      vibe,
+      watched: exclude.has(hit.id) || exclude.has(`${normTitle(title)} ${year}`),
+    });
+  }
+  shelves.winter = (await toCards([...winterMeta.values()], key, (it) => it.why)).map((c) => ({
+    ...c,
+    vibe: winterMeta.get(c.tmdbId)?.vibe || 'melancholy',
+    watched: !!winterMeta.get(c.tmdbId)?.watched,
+  }));
+
   const joinGroups = [pool];
   for (const g of Object.values(shelves)) {
     if (Array.isArray(g)) joinGroups.push(g);
@@ -426,17 +466,7 @@ export async function buildRecs(src, key) {
   // Long comma-laden titles (Jeanne Dielman…) defeat TMDB search outright;
   // retry on the pre-comma stem but accept only an exact normalized-title match,
   // so a making-of documentary can't stand in for the film.
-  const searchSyllabusFilm = async (title, year) => {
-    let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
-    if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
-    if (!s?.results?.length && title.includes(',')) {
-      const stem = await tmdb('/search/movie', { query: title.split(',')[0] }, key);
-      const want = normTitle(title);
-      s = { results: (stem?.results || []).filter((r) => normTitle(r.title) === want) };
-    }
-    await sleep(80);
-    return s?.results?.[0];
-  };
+  const searchSyllabusFilm = (title, year) => searchFilm(title, year, key);
 
   // the professor names the director — always from credits, and when a film
   // is co-directed, the marquee name wins (highest TMDB person popularity:

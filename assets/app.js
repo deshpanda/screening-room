@@ -11,7 +11,7 @@ import {
   h, initTip, stars, vBars, hBars, heatmap, ranked, callout, tile, block,
   resetBlockCounter, scatterChart, worldMap, centuryStrip,
 } from '../lib/render.js';
-import { READING_SHELF, THEORY_SHELF, LEXICON, METHOD } from '../lib/recs.js';
+import { READING_SHELF, THEORY_SHELF, LEXICON, METHOD, WINTER_VIBES } from '../lib/recs.js';
 
 const PAGE = document.body.dataset.page || 'overview';
 const BASE = PAGE === 'overview' ? '' : '../';
@@ -808,6 +808,73 @@ function secNext(v, wrap) {
     }
     const shelf = h('div', 'shelf');
     ts.cards.forEach((c, ci) => shelf.appendChild(buildCard(c, ci < 4)));
+    rx.appendChild(shelf);
+  }
+
+  // frost & tinsel — the winter shelf. Unlike every other shelf, this one keeps
+  // what you have already seen: rewatching Die Hard in December is the point.
+  if (v.recs.winter?.length) {
+    const all = v.recs.winter;
+    const seenCount = all.filter((c) => c.watched).length;
+    rx.appendChild(h('h4', 'shelf-label',
+      `Frost & tinsel — ${all.length} films for the cold months`));
+
+    const bar = h('div', 'winter-bar');
+    const counts = h('span', 'hint-line',
+      `${seenCount} watched · ${all.length - seenCount} still out there`);
+    let onlyUnseen = false;
+    let vibe = 'all';
+
+    const shelf = h('div', 'shelf');
+    const render = () => {
+      shelf.innerHTML = '';
+      const list = all
+        .filter((c) => (onlyUnseen ? !c.watched : true))
+        .filter((c) => (vibe === 'all' ? true : c.vibe === vibe));
+      if (!list.length) {
+        shelf.appendChild(h('p', 'hint-line', 'nothing left in that corner — try another'));
+        return;
+      }
+      list.forEach((c, ci) => {
+        const card = buildCard(c, ci < 4);
+        if (c.watched) {
+          card.classList.add('pcard-seen');
+          card.appendChild(h('span', 'seen-tag', 'watched'));
+        }
+        shelf.appendChild(card);
+      });
+    };
+
+    const toggle = h('button', 'btn winter-toggle', 'Hide watched');
+    toggle.type = 'button';
+    toggle.addEventListener('click', () => {
+      onlyUnseen = !onlyUnseen;
+      toggle.textContent = onlyUnseen ? 'Show all' : 'Hide watched';
+      toggle.classList.toggle('on', onlyUnseen);
+      render();
+    });
+    bar.appendChild(toggle);
+
+    // vibe chips: the shelf reads in flavours, not as one pile
+    const vibes = [...new Set(all.map((c) => c.vibe))];
+    const chipRow = h('div', 'winter-chips');
+    const mkChip = (key, label) => {
+      const b = h('button', 'chip' + (key === 'all' ? ' on' : ''), label);
+      b.type = 'button';
+      b.addEventListener('click', () => {
+        vibe = key;
+        [...chipRow.children].forEach((c) => c.classList.toggle('on', c === b));
+        render();
+      });
+      return b;
+    };
+    chipRow.appendChild(mkChip('all', 'everything'));
+    for (const key of vibes) chipRow.appendChild(mkChip(key, WINTER_VIBES[key] || key));
+    bar.appendChild(counts);
+
+    rx.appendChild(bar);
+    rx.appendChild(chipRow);
+    render();
     rx.appendChild(shelf);
   }
 

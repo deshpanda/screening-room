@@ -522,3 +522,24 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 /* ---- director credit on course rows ---- */
 .course-dir { font-family: var(--mono); font-size: .74rem; color: var(--faint); text-decoration: none; }
 .course-dir:hover { color: var(--amber); text-decoration: underline; text-decoration-style: dotted; }
+
+/* ---- frost & tinsel: the winter shelf ---- */
+.winter-bar { display: flex; align-items: center; gap: 14px; margin: 2px 0 10px; flex-wrap: wrap; }
+.winter-toggle { font-size: .72rem; }
+.winter-toggle.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
+.winter-chips { display: flex; gap: 7px; flex-wrap: wrap; margin: 0 0 14px; }
+.winter-chips .chip {
+  font: inherit; font-family: var(--mono); font-size: .68rem; letter-spacing: .06em;
+  cursor: pointer; color: var(--muted); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+}
+.winter-chips .chip:hover { color: var(--text); border-color: var(--muted); }
+.winter-chips .chip.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
+.pcard-seen { position: relative; }
+.pcard-seen img { opacity: .55; }
+.pcard-seen:hover img { opacity: .8; }
+.seen-tag {
+  position: absolute; top: 8px; left: 8px;
+  font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--bg); background: var(--amber); border-radius: 3px; padding: 2px 6px;
+}
