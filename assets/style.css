@@ -610,3 +610,4 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
   text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px;
 }
 .linky:hover { color: #f2bc66; }
+.wint-more { margin-top: 12px; }

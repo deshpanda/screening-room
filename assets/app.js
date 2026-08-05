@@ -811,24 +811,27 @@ function secNext(v, wrap) {
     rx.appendChild(shelf);
   }
 
-  // frost & tinsel — the winter collection. Deliberately NOT the standard
-  // shelf: those cards bury the writing under four lines of grey metadata and
-  // give 73 films identical weight. Here the posters carry it, the copy comes
-  // forward on hover (and stays visible on the lead tile), and the numbers
-  // shrink to one badge. Films already seen stay in, dimmed with a tick.
+  // frost & tinsel — the winter collection. A fixed, curated set, so it reads
+  // as a collection to work through (like the canon board) rather than a feed:
+  // the note states progress, and seen films stay in, faded, as a rewatch list.
+  // Only a teaser row shows by default, because seventy-three posters would
+  // otherwise bury every shelf below this one.
   if (v.recs.winter?.length) {
     const all = v.recs.winter;
-    const seenCount = all.filter((c) => c.watched).length;
-    rx.appendChild(h('h4', 'shelf-label',
-      `Frost & tinsel — ${all.length} films for the cold months`));
+    const TEASER = 11; // hero (2x2) plus one row beside and under it
 
     let vibe = 'all';
     let onlyUnseen = false;
+    let expanded = false;
     const vibes = [...new Set(all.map((c) => c.vibe))];
+
+    rx.appendChild(h('h4', 'shelf-label',
+      `Frost & tinsel — ${all.length} films for the cold months`));
 
     const chipsRow = h('div', 'yr-chips');
     const note = h('p', 'hint-line');
     const wallEl = h('div', 'wint');
+    const more = h('p', 'hint-line wint-more');
 
     const tile = (c, lead = false) => {
       const a = h('a', 'wint-tile' + (lead ? ' wint-lead' : '') + (c.watched ? ' wint-seen' : ''));
@@ -857,29 +860,51 @@ function secNext(v, wrap) {
     };
 
     const render = () => {
-      const list = all
-        .filter((c) => (onlyUnseen ? !c.watched : true))
-        .filter((c) => (vibe === 'all' ? true : c.vibe === vibe));
+      const inVibe = all.filter((c) => (vibe === 'all' ? true : c.vibe === vibe));
+      const seen = inVibe.filter((c) => c.watched).length;
+      const shown = inVibe.filter((c) => (onlyUnseen ? !c.watched : true));
+      // a chosen corner is small enough to show whole; "everything" is a teaser
+      const limit = vibe === 'all' && !expanded ? TEASER : shown.length;
+      const list = shown.slice(0, limit);
 
       wallEl.innerHTML = '';
       if (!list.length) {
-        wallEl.appendChild(h('p', 'hint-line', 'nothing left in that corner'));
+        wallEl.appendChild(h('p', 'hint-line',
+          seen === inVibe.length
+            ? 'you have seen every one of these — which makes this a rewatch list now'
+            : 'nothing left in this corner'));
       } else {
-        // the lead tile shows its copy without a hover, so the writing lands
         list.forEach((c, i) => wallEl.appendChild(tile(c, i === 0)));
       }
 
+      // the note: what this corner is, then how far through it you are
       note.innerHTML = '';
-      note.appendChild(document.createTextNode(vibe === 'all'
+      const desc = vibe === 'all'
         ? 'snow, tinsel, and the long dark'
-        : WINTER_VIBES[vibe]?.note || vibe));
-      if (seenCount) {
-        note.appendChild(document.createTextNode(
-          ` · ${seenCount} seen, ${onlyUnseen ? 'hidden' : 'kept'} — `));
-        const t = h('button', 'linky', onlyUnseen ? 'show them' : 'hide them');
+        : WINTER_VIBES[vibe]?.note || vibe;
+      let progress = '';
+      if (!seen) progress = `all ${inVibe.length} still ahead of you`;
+      else if (seen === inVibe.length) progress = `you have seen all ${inVibe.length}`;
+      else progress = `you have seen ${seen} of ${inVibe.length}`;
+      note.appendChild(document.createTextNode(`${desc} · ${progress}`));
+      if (seen && seen < inVibe.length) {
+        note.appendChild(document.createTextNode(' · '));
+        const t = h('button', 'linky', onlyUnseen ? 'show those' : 'hide those');
         t.type = 'button';
         t.addEventListener('click', () => { onlyUnseen = !onlyUnseen; render(); });
         note.appendChild(t);
+      }
+
+      // the expander, only when "everything" is holding films back
+      more.innerHTML = '';
+      const hidden = shown.length - list.length;
+      if (vibe === 'all' && (hidden > 0 || expanded)) {
+        const b = h('button', 'linky', expanded
+          ? 'show fewer'
+          : `show all ${shown.length} — or pick a corner above`);
+        b.type = 'button';
+        b.addEventListener('click', () => { expanded = !expanded; render(); });
+        more.appendChild(b);
       }
     };
 
@@ -888,6 +913,7 @@ function secNext(v, wrap) {
       b.type = 'button';
       b.addEventListener('click', () => {
         vibe = key;
+        expanded = false;
         [...chipsRow.children].forEach((c) => c.classList.toggle('chip-on', c === b));
         render();
       });
@@ -903,6 +929,7 @@ function secNext(v, wrap) {
     rx.appendChild(note);
     render();
     rx.appendChild(wallEl);
+    rx.appendChild(more);
   }
 
   // the canon board — every master, and how far in you are
