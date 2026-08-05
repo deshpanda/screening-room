@@ -811,11 +811,11 @@ function secNext(v, wrap) {
     rx.appendChild(shelf);
   }
 
-  // frost & tinsel — the winter shelf. Unlike every other shelf, this one keeps
-  // what you have already seen: rewatching Die Hard in December is the point.
-  // Controls stay in the site's own language: one row of terse chips, and the
-  // long description lives in the note line, where the rest of the site keeps
-  // its microcopy.
+  // frost & tinsel — the winter collection. Deliberately NOT the standard
+  // shelf: those cards bury the writing under four lines of grey metadata and
+  // give 73 films identical weight. Here the posters carry it, the copy comes
+  // forward on hover (and stays visible on the lead tile), and the numbers
+  // shrink to one badge. Films already seen stay in, dimmed with a tick.
   if (v.recs.winter?.length) {
     const all = v.recs.winter;
     const seenCount = all.filter((c) => c.watched).length;
@@ -828,33 +828,54 @@ function secNext(v, wrap) {
 
     const chipsRow = h('div', 'yr-chips');
     const note = h('p', 'hint-line');
-    const shelf = h('div', 'shelf');
+    const wallEl = h('div', 'wint');
+
+    const tile = (c, lead = false) => {
+      const a = h('a', 'wint-tile' + (lead ? ' wint-lead' : '') + (c.watched ? ' wint-seen' : ''));
+      a.href = lbUrl(c.tmdbId);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      if (c.poster) {
+        const img = document.createElement('img');
+        img.loading = lead ? 'eager' : 'lazy';
+        img.alt = `${c.title} poster`;
+        img.src = `https://image.tmdb.org/t/p/w500${c.poster}`;
+        a.appendChild(img);
+      } else {
+        a.appendChild(h('div', 'noposter', c.title));
+      }
+      const score = c.imdb?.rating || c.tmdb?.rating;
+      if (score) a.appendChild(h('span', 'wint-score', String(score)));
+      if (c.watched) a.appendChild(h('span', 'wint-tick', '✓'));
+      const cap = h('div', 'wint-cap');
+      const t = h('p', 'wint-t', c.title);
+      t.appendChild(h('span', 'wint-y', ` ${c.year}`));
+      cap.appendChild(t);
+      if (c.why) cap.appendChild(h('p', 'wint-why', c.why));
+      a.appendChild(cap);
+      return a;
+    };
 
     const render = () => {
       const list = all
         .filter((c) => (onlyUnseen ? !c.watched : true))
         .filter((c) => (vibe === 'all' ? true : c.vibe === vibe));
 
-      shelf.innerHTML = '';
-      list.forEach((c, ci) => {
-        const card = buildCard(c, ci < 4);
-        if (c.watched) {
-          card.classList.add('pcard-seen');
-          card.appendChild(h('span', 'seen-tag', 'seen'));
-        }
-        shelf.appendChild(card);
-      });
-      if (!list.length) shelf.appendChild(h('p', 'hint-line', 'nothing left in that corner'));
+      wallEl.innerHTML = '';
+      if (!list.length) {
+        wallEl.appendChild(h('p', 'hint-line', 'nothing left in that corner'));
+      } else {
+        // the lead tile shows its copy without a hover, so the writing lands
+        list.forEach((c, i) => wallEl.appendChild(tile(c, i === 0)));
+      }
 
-      // the note carries the vibe's description and the watched control
       note.innerHTML = '';
-      const desc = vibe === 'all'
+      note.appendChild(document.createTextNode(vibe === 'all'
         ? 'snow, tinsel, and the long dark'
-        : WINTER_VIBES[vibe]?.note || vibe;
-      note.appendChild(document.createTextNode(desc));
+        : WINTER_VIBES[vibe]?.note || vibe));
       if (seenCount) {
         note.appendChild(document.createTextNode(
-          ` · ${seenCount} you have already seen, ${onlyUnseen ? 'hidden' : 'dimmed'} — `));
+          ` · ${seenCount} seen, ${onlyUnseen ? 'hidden' : 'kept'} — `));
         const t = h('button', 'linky', onlyUnseen ? 'show them' : 'hide them');
         t.type = 'button';
         t.addEventListener('click', () => { onlyUnseen = !onlyUnseen; render(); });
@@ -881,7 +902,7 @@ function secNext(v, wrap) {
     rx.appendChild(chipsRow);
     rx.appendChild(note);
     render();
-    rx.appendChild(shelf);
+    rx.appendChild(wallEl);
   }
 
   // the canon board — every master, and how far in you are

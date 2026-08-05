@@ -67,15 +67,34 @@ async function imdbRatings(neededIds) {
  * for the film.
  */
 async function searchFilm(title, year, key) {
+  const want = normTitle(title);
+  // TMDB's relevance ranking is not title-accuracy: searching "The Grey" (2011)
+  // can return "Documenting the Grey Man" first. For a curated list, an exact
+  // normalized-title match always wins, preferring the right release year;
+  // only then do we fall back to whatever TMDB ranked highest.
+  const pick = (results) => {
+    if (!results?.length) return undefined;
+    const exact = results.filter((r) => normTitle(r.title) === want
+      || normTitle(r.original_title || '') === want);
+    if (exact.length) {
+      return exact.find((r) => (r.release_date || '').startsWith(String(year)))
+        || exact.sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0))[0];
+    }
+    return results[0];
+  };
+
   let s = await tmdb('/search/movie', { query: title, primary_release_year: year }, key);
-  if (!s?.results?.length) s = await tmdb('/search/movie', { query: title }, key);
-  if (!s?.results?.length && title.includes(',')) {
+  let hit = pick(s?.results);
+  if (!hit) {
+    s = await tmdb('/search/movie', { query: title }, key);
+    hit = pick(s?.results);
+  }
+  if (!hit && title.includes(',')) {
     const stem = await tmdb('/search/movie', { query: title.split(',')[0] }, key);
-    const want = normTitle(title);
-    s = { results: (stem?.results || []).filter((r) => normTitle(r.title) === want) };
+    hit = (stem?.results || []).find((r) => normTitle(r.title) === want);
   }
   await sleep(80);
-  return s?.results?.[0];
+  return hit;
 }
 
 async function toCards(items, key, whyOf = () => null) {

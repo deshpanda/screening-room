@@ -523,24 +523,90 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 .course-dir { font-family: var(--mono); font-size: .74rem; color: var(--faint); text-decoration: none; }
 .course-dir:hover { color: var(--amber); text-decoration: underline; text-decoration-style: dotted; }
 
-/* ---- frost & tinsel: the winter shelf ---- */
-/* Controls reuse .yr-chips + button.chip so the shelf looks native. The only
-   new pieces: an inline text toggle, and a quiet mark for films already seen
-   (muted, not amber: amber means active here, and "seen" is not a highlight). */
+/* ---- frost & tinsel: the winter collection ---------------------------------
+   Poster-first, because the posters are the best thing on the page and the
+   standard card buries them under four lines of grey metadata. Copy rides in
+   on a scrim over the art; one score badge replaces the numbers; the lead tile
+   spans two columns and keeps its copy visible so the writing lands without a
+   hover. Touch devices get the caption permanently (there is no hover there). */
+.wint {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+}
+.wint-tile {
+  position: relative; display: block; overflow: hidden;
+  border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); aspect-ratio: 2 / 3;
+  text-decoration: none;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.wint-tile:hover { border-color: var(--amber); transform: translateY(-3px); text-decoration: none; }
+.wint-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wint-tile .noposter {
+  display: grid; place-items: center; height: 100%; padding: 10px; text-align: center;
+  font-size: 0.8rem; color: var(--muted);
+}
+
+/* the lead tile: two columns wide, copy always showing */
+.wint-lead {
+  /* two columns by two rows keeps the poster's own 2:3 shape, so the hero is a
+     full uncropped sheet rather than a letterboxed crop of one */
+  grid-column: span 2; grid-row: span 2; aspect-ratio: auto;
+}
+
+/* one number, not three */
+.wint-score {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  font-family: var(--mono); font-size: 0.66rem; font-weight: 700;
+  color: var(--text); background: rgba(14, 12, 9, 0.78);
+  border: 1px solid rgba(236, 228, 214, 0.14); border-radius: 4px; padding: 2px 6px;
+  backdrop-filter: blur(4px);
+}
+.wint-tick {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  font-size: 0.7rem; line-height: 1; color: var(--bg);
+  background: var(--amber); border-radius: 50%; width: 18px; height: 18px;
+  display: grid; place-items: center;
+}
+
+/* the copy, on a scrim over the art */
+.wint-cap {
+  position: absolute; inset: auto 0 0 0; z-index: 1;
+  padding: 26px 11px 11px;
+  background: linear-gradient(to top, rgba(14, 12, 9, 0.96) 12%, rgba(14, 12, 9, 0.82) 45%, transparent);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.wint-tile:hover .wint-cap, .wint-tile:focus-visible .wint-cap { opacity: 1; transform: none; }
+.wint-lead .wint-cap { opacity: 1; transform: none; padding: 34px 16px 15px; }
+.wint-t {
+  margin: 0; font-size: 0.86rem; font-weight: 700; line-height: 1.25; color: var(--text);
+}
+.wint-lead .wint-t { font-size: 1.15rem; }
+.wint-y { font-weight: 400; color: var(--muted); font-family: var(--mono); font-size: 0.74rem; }
+.wint-why {
+  margin: 5px 0 0; font-size: 0.74rem; line-height: 1.4; color: var(--muted);
+}
+.wint-lead .wint-why { font-size: 0.88rem; color: #cfc5b4; max-width: 44ch; }
+
+/* seen: still here, just stepped back. Fade toward black and drain some colour,
+   so it reads as memory rather than as a tinted poster (the warm surface
+   underneath turns plain opacity into a muddy olive wash). */
+.wint-seen { background: #000; }
+.wint-seen img { opacity: 0.5; filter: grayscale(0.55); }
+.wint-seen:hover img { opacity: 0.85; filter: grayscale(0.1); }
+/* the hero never fades, even when seen: it is the tile carrying the writing,
+   and the tick already says you have been here */
+.wint-lead.wint-seen img { opacity: 1; filter: none; }
+
+@media (hover: none) {
+  .wint-cap { opacity: 1; transform: none; }
+  .wint-why { display: none; }
+  .wint-lead .wint-why { display: block; }
+}
+
 .linky {
-  font: inherit; font-family: inherit; font-size: inherit; cursor: pointer;
-  color: var(--amber); background: none; border: 0; padding: 0;
+  font: inherit; cursor: pointer; color: var(--amber); background: none; border: 0; padding: 0;
   text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px;
 }
 .linky:hover { color: #f2bc66; }
-.pcard-seen { position: relative; }
-.pcard-seen img { opacity: 0.42; }
-.pcard-seen:hover img { opacity: 0.75; }
-.pcard-seen .t, .pcard-seen .m, .pcard-seen .why { color: var(--faint); }
-.seen-tag {
-  position: absolute; top: 7px; left: 7px;
-  font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--muted);
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px;
-}
