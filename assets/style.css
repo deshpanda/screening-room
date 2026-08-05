@@ -524,22 +524,23 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 .course-dir:hover { color: var(--amber); text-decoration: underline; text-decoration-style: dotted; }
 
 /* ---- frost & tinsel: the winter shelf ---- */
-.winter-bar { display: flex; align-items: center; gap: 14px; margin: 2px 0 10px; flex-wrap: wrap; }
-.winter-toggle { font-size: .72rem; }
-.winter-toggle.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
-.winter-chips { display: flex; gap: 7px; flex-wrap: wrap; margin: 0 0 14px; }
-.winter-chips .chip {
-  font: inherit; font-family: var(--mono); font-size: .68rem; letter-spacing: .06em;
-  cursor: pointer; color: var(--muted); background: var(--surface);
-  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+/* Controls reuse .yr-chips + button.chip so the shelf looks native. The only
+   new pieces: an inline text toggle, and a quiet mark for films already seen
+   (muted, not amber: amber means active here, and "seen" is not a highlight). */
+.linky {
+  font: inherit; font-family: inherit; font-size: inherit; cursor: pointer;
+  color: var(--amber); background: none; border: 0; padding: 0;
+  text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px;
 }
-.winter-chips .chip:hover { color: var(--text); border-color: var(--muted); }
-.winter-chips .chip.on { color: var(--bg); background: var(--amber); border-color: var(--amber); }
+.linky:hover { color: #f2bc66; }
 .pcard-seen { position: relative; }
-.pcard-seen img { opacity: .55; }
-.pcard-seen:hover img { opacity: .8; }
+.pcard-seen img { opacity: 0.42; }
+.pcard-seen:hover img { opacity: 0.75; }
+.pcard-seen .t, .pcard-seen .m, .pcard-seen .why { color: var(--faint); }
 .seen-tag {
-  position: absolute; top: 8px; left: 8px;
-  font-family: var(--mono); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--bg); background: var(--amber); border-radius: 3px; padding: 2px 6px;
+  position: absolute; top: 7px; left: 7px;
+  font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted);
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px;
 }

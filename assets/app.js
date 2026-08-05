@@ -813,67 +813,73 @@ function secNext(v, wrap) {
 
   // frost & tinsel — the winter shelf. Unlike every other shelf, this one keeps
   // what you have already seen: rewatching Die Hard in December is the point.
+  // Controls stay in the site's own language: one row of terse chips, and the
+  // long description lives in the note line, where the rest of the site keeps
+  // its microcopy.
   if (v.recs.winter?.length) {
     const all = v.recs.winter;
     const seenCount = all.filter((c) => c.watched).length;
     rx.appendChild(h('h4', 'shelf-label',
       `Frost & tinsel — ${all.length} films for the cold months`));
 
-    const bar = h('div', 'winter-bar');
-    const counts = h('span', 'hint-line',
-      `${seenCount} watched · ${all.length - seenCount} still out there`);
-    let onlyUnseen = false;
     let vibe = 'all';
+    let onlyUnseen = false;
+    const vibes = [...new Set(all.map((c) => c.vibe))];
 
+    const chipsRow = h('div', 'yr-chips');
+    const note = h('p', 'hint-line');
     const shelf = h('div', 'shelf');
+
     const render = () => {
-      shelf.innerHTML = '';
       const list = all
         .filter((c) => (onlyUnseen ? !c.watched : true))
         .filter((c) => (vibe === 'all' ? true : c.vibe === vibe));
-      if (!list.length) {
-        shelf.appendChild(h('p', 'hint-line', 'nothing left in that corner — try another'));
-        return;
-      }
+
+      shelf.innerHTML = '';
       list.forEach((c, ci) => {
         const card = buildCard(c, ci < 4);
         if (c.watched) {
           card.classList.add('pcard-seen');
-          card.appendChild(h('span', 'seen-tag', 'watched'));
+          card.appendChild(h('span', 'seen-tag', 'seen'));
         }
         shelf.appendChild(card);
       });
+      if (!list.length) shelf.appendChild(h('p', 'hint-line', 'nothing left in that corner'));
+
+      // the note carries the vibe's description and the watched control
+      note.innerHTML = '';
+      const desc = vibe === 'all'
+        ? 'snow, tinsel, and the long dark'
+        : WINTER_VIBES[vibe]?.note || vibe;
+      note.appendChild(document.createTextNode(desc));
+      if (seenCount) {
+        note.appendChild(document.createTextNode(
+          ` · ${seenCount} you have already seen, ${onlyUnseen ? 'hidden' : 'dimmed'} — `));
+        const t = h('button', 'linky', onlyUnseen ? 'show them' : 'hide them');
+        t.type = 'button';
+        t.addEventListener('click', () => { onlyUnseen = !onlyUnseen; render(); });
+        note.appendChild(t);
+      }
     };
 
-    const toggle = h('button', 'btn winter-toggle', 'Hide watched');
-    toggle.type = 'button';
-    toggle.addEventListener('click', () => {
-      onlyUnseen = !onlyUnseen;
-      toggle.textContent = onlyUnseen ? 'Show all' : 'Hide watched';
-      toggle.classList.toggle('on', onlyUnseen);
-      render();
-    });
-    bar.appendChild(toggle);
-
-    // vibe chips: the shelf reads in flavours, not as one pile
-    const vibes = [...new Set(all.map((c) => c.vibe))];
-    const chipRow = h('div', 'winter-chips');
-    const mkChip = (key, label) => {
-      const b = h('button', 'chip' + (key === 'all' ? ' on' : ''), label);
+    const chip = (key, label, count) => {
+      const b = h('button', 'chip' + (key === 'all' ? ' chip-on' : ''), `${label} · ${count}`);
       b.type = 'button';
       b.addEventListener('click', () => {
         vibe = key;
-        [...chipRow.children].forEach((c) => c.classList.toggle('on', c === b));
+        [...chipsRow.children].forEach((c) => c.classList.toggle('chip-on', c === b));
         render();
       });
       return b;
     };
-    chipRow.appendChild(mkChip('all', 'everything'));
-    for (const key of vibes) chipRow.appendChild(mkChip(key, WINTER_VIBES[key] || key));
-    bar.appendChild(counts);
+    chipsRow.appendChild(chip('all', 'everything', all.length));
+    for (const key of vibes) {
+      chipsRow.appendChild(chip(key, WINTER_VIBES[key]?.short || key,
+        all.filter((c) => c.vibe === key).length));
+    }
 
-    rx.appendChild(bar);
-    rx.appendChild(chipRow);
+    rx.appendChild(chipsRow);
+    rx.appendChild(note);
     render();
     rx.appendChild(shelf);
   }
