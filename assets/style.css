@@ -611,3 +611,10 @@ ul.printlog li .t { font-family: var(--mono); font-size: .82rem; color: var(--fa
 }
 .linky:hover { color: #f2bc66; }
 .wint-more { margin-top: 12px; }
+/* the seen filter is a mode, not a per-theme link: it sits apart from the
+   theme chips, after a hairline, and keeps its state across theme switches */
+.chip-sep {
+  width: 1px; align-self: stretch; background: var(--line); margin: 2px 4px;
+}
+.chip-mode { color: var(--faint); }
+.chip-mode:hover { color: var(--text); border-color: var(--muted); }

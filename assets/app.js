@@ -833,6 +833,11 @@ function secNext(v, wrap) {
     const wallEl = h('div', 'wint');
     const more = h('p', 'hint-line wint-more');
 
+    const seenToggle = h('button', 'chip chip-mode', 'seen: shown');
+    seenToggle.type = 'button';
+    seenToggle.title = 'Films already in your diary stay in this collection, faded';
+    seenToggle.addEventListener('click', () => { onlyUnseen = !onlyUnseen; render(); });
+
     const tile = (c, lead = false) => {
       const a = h('a', 'wint-tile' + (lead ? ' wint-lead' : '') + (c.watched ? ' wint-seen' : ''));
       a.href = lbUrl(c.tmdbId);
@@ -877,23 +882,17 @@ function secNext(v, wrap) {
         list.forEach((c, i) => wallEl.appendChild(tile(c, i === 0)));
       }
 
-      // the note: what this corner is, then how far through it you are
-      note.innerHTML = '';
-      const desc = vibe === 'all'
-        ? 'snow, tinsel, and the long dark'
-        : WINTER_VIBES[vibe]?.note || vibe;
-      let progress = '';
+      // the note is prose only: what this corner is, and how far through it you
+      // are. The seen filter is one persistent control in the chip row, because
+      // it is a mode that outlives whichever corner you happen to be reading.
+      let progress;
       if (!seen) progress = `all ${inVibe.length} still ahead of you`;
       else if (seen === inVibe.length) progress = `you have seen all ${inVibe.length}`;
       else progress = `you have seen ${seen} of ${inVibe.length}`;
-      note.appendChild(document.createTextNode(`${desc} · ${progress}`));
-      if (seen && seen < inVibe.length) {
-        note.appendChild(document.createTextNode(' · '));
-        const t = h('button', 'linky', onlyUnseen ? 'show those' : 'hide those');
-        t.type = 'button';
-        t.addEventListener('click', () => { onlyUnseen = !onlyUnseen; render(); });
-        note.appendChild(t);
-      }
+      note.textContent = `${vibe === 'all' ? 'snow, tinsel, and the long dark' : WINTER_VIBES[vibe]?.note || vibe} · ${progress}`;
+      seenToggle.textContent = onlyUnseen ? 'seen: hidden' : 'seen: shown';
+      seenToggle.classList.toggle('chip-on', onlyUnseen);
+      seenToggle.hidden = !all.some((c) => c.watched);
 
       // the expander, only when "everything" is holding films back
       more.innerHTML = '';
@@ -924,6 +923,8 @@ function secNext(v, wrap) {
       chipsRow.appendChild(chip(key, WINTER_VIBES[key]?.short || key,
         all.filter((c) => c.vibe === key).length));
     }
+    chipsRow.appendChild(h('span', 'chip-sep'));
+    chipsRow.appendChild(seenToggle);
 
     rx.appendChild(chipsRow);
     rx.appendChild(note);

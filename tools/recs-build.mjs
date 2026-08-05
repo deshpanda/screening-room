@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS, SYLLABUS_EXTRAS, WINTER_FILMS } from '../lib/recs.js';
+import { seedWeight, aggregate, genreAffinity, normTitle, CANON_DIRECTORS, TMDB_GENRES, SYLLABUS, SYLLABUS_EXTRAS, WINTER_FILMS, WINTER_KEYWORDS } from '../lib/recs.js';
 import { filmKey } from '../lib/insights.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -433,6 +433,80 @@ export async function buildRecs(src, key) {
     watched: !!winterMeta.get(c.tmdbId)?.watched,
   }));
 
+  // Top-up so the collection cannot run dry: TMDB keyword discovery, then
+  // ranked against this viewer's actual leanings rather than by popularity.
+  // Curated films always lead; these are labelled "found" so the hand-picked
+  // ones stay distinguishable. Watched films are excluded here (the curated
+  // list already carries the rewatch value; a top-up exists to find new ones).
+  const curatedIds = new Set(shelves.winter.map((c) => c.tmdbId));
+  const curatedTitles = new Set(shelves.winter.map((c) => normTitle(c.title)));
+  const found = new Map();
+  for (const [label, kwId] of WINTER_KEYWORDS) {
+    for (const page of [1, 2]) {
+      const d = await tmdb('/discover/movie', {
+        with_keywords: kwId,
+        sort_by: 'vote_average.desc',
+        'vote_count.gte': 400,
+        'vote_average.gte': 6.9,
+        include_adult: false,
+        page,
+      }, key);
+      await sleep(90);
+      for (const r of d?.results || []) {
+        if (curatedIds.has(r.id) || curatedTitles.has(normTitle(r.title))) continue;
+        if (exclude.has(r.id) || exclude.has(`${normTitle(r.title)} ${yearOf(r.release_date)}`)) continue;
+        if (!r.poster_path) continue;
+        const prev = found.get(r.id);
+        if (prev) { prev.kw.add(label); continue; }
+        found.set(r.id, { id: r.id, raw: r, kw: new Set([label]) });
+      }
+    }
+  }
+
+  // Score by taste, not by crowd: the canon bias the owner asked for, the
+  // genres they actually rate highly, world cinema over Hollywood, and a nod
+  // to films that turn up under more than one winter keyword.
+  const canonSet = new Set(CANON_DIRECTORS);
+  for (const f of found.values()) {
+    const r = f.raw;
+    const genres = (r.genre_ids || []).map((g) => TMDB_GENRES[g]).filter(Boolean);
+    let score = (r.vote_average || 0) * 10;
+    score += genreAffinity(topGenres, genres) * 22;
+    if ((r.original_language || 'en') !== 'en') score += 14;   // world cinema
+    if (f.kw.size > 1) score += 8;                             // winter twice over
+    if ((r.vote_count || 0) > 20000) score -= 6;               // deep cuts preferred
+    f.score = score;
+    f.genres = genres;
+  }
+
+  // One credits call each for the strongest handful, so a canon director can
+  // earn its place; then keep the best fifteen.
+  const ranked = [...found.values()].sort((a, b) => b.score - a.score).slice(0, 40);
+  for (const f of ranked) {
+    const d = await tmdb(`/movie/${f.id}`, { append_to_response: 'credits' }, key);
+    await sleep(80);
+    const dirs = (d?.credits?.crew || []).filter((c) => c.job === 'Director');
+    dirs.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    f.director = dirs[0]?.name || null;
+    if (f.director && canonSet.has(f.director)) f.score += 45;   // the canon wins
+    if (f.director && watchedDirectorsCount.get(f.director)) f.score += 12; // a director already loved
+  }
+  ranked.sort((a, b) => b.score - a.score);
+  const picks = ranked.slice(0, 15);
+
+  const whyFound = (f) => {
+    if (f.director && canonSet.has(f.director)) return `${f.director}, and it snows`;
+    if (f.director && watchedDirectorsCount.get(f.director)) return `more ${f.director}, in the cold`;
+    const kw = [...f.kw][0];
+    return `found under "${kw}"`;
+  };
+  const foundCards = (await toCards(picks, key, () => null)).map((c) => {
+    const f = picks.find((x) => x.id === c.tmdbId);
+    return { ...c, vibe: 'found', watched: false, why: f ? whyFound(f) : 'found in the snow' };
+  });
+  shelves.winter = [...shelves.winter, ...foundCards];
+  console.log(`  recs: winter top-up found ${foundCards.length} (from ${found.size} candidates)`);
+
   const joinGroups = [pool];
   for (const g of Object.values(shelves)) {
     if (Array.isArray(g)) joinGroups.push(g);
@@ -451,6 +525,10 @@ export async function buildRecs(src, key) {
   // The floor: a recommendation shelf earns trust by what it refuses to show.
   const floor = (c) => (c.imdb?.rating ? c.imdb.rating >= 6.8 : (c.tmdb?.rating || 0) >= 7.2);
   shelves.because = shelves.because.filter(floor).slice(0, 12);
+  // The curated winter films are vouched for by hand; the discovered ones must
+  // clear the same floor every other shelf does (this is where About Fate, a
+  // 6.4, gets shown the door).
+  shelves.winter = shelves.winter.filter((c) => c.vibe !== 'found' || floor(c));
 
   // Carve the shared pool: the main shelf first, then the runtime shelves
   // take what's left so nothing repeats.
